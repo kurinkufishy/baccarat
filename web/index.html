@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.cloudfunctions.net https://*.run.app; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>仲間内バカラ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rubik:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage" id="stage" aria-label="テーブル">
+    <svg class="layer" id="backsvg" aria-hidden="true"></svg>
+    <div id="cards"></div>
+    <svg class="layer" id="armsvg" aria-hidden="true"><g id="armg"></g></svg>
+    <div class="hud">
+      <div class="tname">仲間内バカラ <span class="num" id="roundtxt"></span><small>ベット 100〜上限なし · ディーラー: AI</small></div>
+      <div class="icons">
+        <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
+        <button class="ib" id="statsbtn" aria-pressed="false" hidden>統計</button>
+        <button class="ib" id="sidebtn" aria-pressed="false" hidden>メンバー</button>
+        <button class="ib" id="rulesbtn">ルール</button>
+        <button class="ib acct" id="acctbtn" hidden></button>
+      </div>
+    </div>
+    <div id="pill" aria-live="polite"></div>
+    <div class="winners" id="winners"></div>
+    <aside class="side" id="side" hidden>
+      <div class="tabs"><button data-tab="live" class="on">ライブベット</button><button data-tab="rank">ランキング</button></div>
+      <div class="sidebody" id="sidebody"></div>
+      <div class="sidefoot" id="sidefoot"></div>
+    </aside>
+
+    <div class="gate" id="gate">
+      <div class="gatebox" id="gatebox">
+        <h1>BACCARAT</h1>
+        <p>接続中…</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="console">
+    <section class="rpanel bead" aria-label="ビーズロード">
+      <div class="rhead num" id="beadhead"></div>
+      <div class="rscroll" id="beadscroll"><div class="bgrid" id="beadgrid"></div></div>
+    </section>
+    <section class="board" id="board" aria-label="ベットエリア"></section>
+    <section class="rpanel big" aria-label="大路">
+      <div class="rhead">大路</div>
+      <div class="rscroll" id="bigscroll"><div class="biggrid" id="biggrid"></div></div>
+    </section>
+  </div>
+
+  <div class="chipbar" id="chipbar">
+    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div></div><button class="plus" id="walletbtn" aria-label="ウォレットを開いて入金" disabled>+</button></div>
+    <div class="mid" id="mid"></div>
+    <div class="totbet"><span class="lb">トータルベット</span><span class="amt num" id="mytotal">0</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="walletm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
+    <div class="mhead"><span id="wt">ウォレット・入金</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="sumline"><span>今の残高</span><span class="num" id="wbal">0</span></div>
+    <div class="packs" id="packs"></div>
+    <div><label class="flab" for="customdep">好きな額を入金（1回 1,000,000 まで）</label>
+      <div class="amtrow"><input id="customdep" inputmode="numeric" class="num" placeholder="例: 25000" autocomplete="off"></div></div>
+    <button class="go" id="depbtn" style="padding:14px">入金する</button>
+    <p class="small">チップは全部架空で、お金はかからないよ。入金した分は収支から差し引かれるので、ランキングは公平なまま。</p>
+  </div>
+</div>
+
+<div class="overlay" id="rulesm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rt">
+    <div class="mhead"><span id="rt">ルール</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="rules">
+      <b>進行</b>　ベット受付は15秒。時間切れで自動ディール、結果が出て数秒後に次のゲームへ。誰も賭けないゲームが3回続くと休憩に入り、誰かがチップを置くと再開するよ。<br>
+      <b>点数</b>　A=1、10・絵札=0、合計の下一桁が9に近い方が勝ち。最初の2枚で8か9ならナチュラルで終了。プレイヤーは0〜5で3枚目を引き、バンカーはプレイヤーの3枚目に応じて正式ルール通り引く。<br>
+      <b>配当</b>　プレイヤー 1:1 ／ バンカー 0.95:1 ／ タイ 8:1（P・Bのベットは返却）／ ペア 11:1。8デッキ使用。<br>
+      <b>公平さ</b>　シャッフル・配り・精算はすべてサーバーが行い、山札は誰にも見えない。<br>
+      <b>チップ</b>　全部架空で1人10,000スタート。残高の「＋」から入金できる（収支からは差し引かれる）。
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="acctm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="at">
+    <div class="mhead"><span id="at">アカウント</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="sumline"><span>ログイン中</span><span id="acctmail"></span></div>
+    <button class="ib" id="leavebtn" style="justify-content:center;height:40px">席を立つ</button>
+    <button class="ib" id="signout" style="justify-content:center;height:40px">ログアウト</button>
+  </div>
+</div>
+
+<div class="statsp" id="statsp" hidden role="region" aria-label="自分の統計">
+  <div class="mhead"><span>自分の統計</span><button class="x" id="statsx" aria-label="閉じる">×</button></div>
+  <div class="tiles">
+    <div class="tile"><span>利益</span><b class="num" id="s_prof">0</b></div>
+    <div class="tile"><span>賭け総額</span><b class="num" id="s_wag">0</b></div>
+    <div class="tile"><span>勝率</span><b class="num" id="s_rate">–</b></div>
+  </div>
+  <div class="winbar" id="winbar"></div>
+  <div class="legend2" id="wl"></div>
+  <div class="chartbox" id="chartbox"></div>
+  <p class="small">ベットしたゲームごとの累計利益。グラフをなぞると各ゲームの値が出るよ。</p>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

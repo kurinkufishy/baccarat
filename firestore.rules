@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// Clients never write. Every change goes through Cloud Functions (Admin SDK bypasses these rules).
+// Reading needs a Google sign-in with a verified email AND a seat record created by the `join` function.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+    function member() {
+      return signedIn() && exists(/databases/$(database)/documents/players/$(request.auth.uid));
+    }
+
+    match /tables/{table} {
+      allow read: if member();
+      allow write: if false;
+
+      match /bets/{uid} {
+        allow read: if member();
+        allow write: if false;
+      }
+      // The shuffled shoe. Nobody but the server may see it.
+      match /private/{doc} {
+        allow read, write: if false;
+      }
+    }
+
+    match /players/{uid} {
+      // You can always read your own record (to know whether you have joined); others need to be members.
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow read: if member();
+      allow write: if false;
+    }
+
+    // Allow-list and anything else: server only.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
