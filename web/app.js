@@ -6,7 +6,8 @@ import { firebaseConfig, functionsRegion } from "./firebase-config.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 1000000;
-const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 500, c: "#8e44ad", l: "500" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 5000, c: "#d63447", l: "5K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 50000, c: "#c98a12", l: "50K" }];
+const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 500, c: "#8e44ad", l: "500" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 5000, c: "#d63447", l: "5K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 50000, c: "#c98a12", l: "50K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }];
+const MAX_SPOT = 10000000; // per spot, same as functions/game.js
 const SPOTS = [
   { k: "ppair", nm: "P ペア", od: "11:1", side: 1 }, { k: "player", nm: "プレイヤー", od: "1:1" }, { k: "tie", nm: "タイ", od: "8:1" },
   { k: "banker", nm: "バンカー", od: "0.95:1" }, { k: "bpair", nm: "B ペア", od: "11:1", side: 1 }];
@@ -120,8 +121,11 @@ function placeBet(k) {
   if (!bettingOpen()) { flash("ベット締切。次のゲームを待ってね"); return; }
   const free = myFree();
   if (free <= 0) { flash("チップが足りない。残高の＋から入金できるよ"); return; }
-  const b = { ...myBets() }; b[k] += Math.min(amount, free);
-  placedStack.push({ k, v: Math.min(amount, free) });
+  const b = { ...myBets() };
+  const v = Math.min(amount === "all" ? free : amount, free, MAX_SPOT - b[k]);
+  if (v <= 0) { flash("1か所に置けるのは 10,000,000 まで"); return; }
+  b[k] += v;
+  placedStack.push({ k, v });
   queueBets(b);
 }
 let placedStack = [], placedRound = 0;
@@ -423,8 +427,9 @@ function renderMid() {
     const rep = stake ? "2倍" : "リピート", repDis = !open || (!stake && !(last && sum(last)));
     h = `<button class="cbtn" id="undo" aria-label="ひとつ戻す" ${!open || !stake ? "disabled" : ""}>↶</button>`
       + CHIPS.map((c) => `<button class="chip ${c.v === amount ? "on" : ""}" style="--cc:${c.c}" data-v="${c.v}" aria-pressed="${c.v === amount}">${c.l}</button>`).join("")
+      + `<button class="chip allbet ${amount === "all" ? "on" : ""}" data-v="all" aria-pressed="${amount === "all"}" aria-label="ALL BET 残高を全部賭ける">ALL<br>BET</button>`
       + `<button class="cbtn wide" id="rep" ${repDis ? "disabled" : ""}>${rep}</button>`
-      + (state.phase === "betting" && open && sum(serverMyBets()) ? `<button class="cbtn wide" id="dealnow">今すぐ配る</button>` : "");
+      ;
   }
   if (h !== midKey) { $("mid").innerHTML = h; midKey = h; }
 }
@@ -529,10 +534,9 @@ function drawChart(curve) {
 /* ================= events ================= */
 $("board").addEventListener("click", (e) => { const b = e.target.closest(".spot"); if (b) { if (placedRound !== state.round) { placedStack = []; placedRound = state.round; } placeBet(b.dataset.k); } });
 $("mid").addEventListener("click", (e) => {
-  const c = e.target.closest(".chip"); if (c) { amount = +c.dataset.v; render(); return; }
+  const c = e.target.closest(".chip"); if (c) { amount = c.dataset.v === "all" ? "all" : +c.dataset.v; render(); return; }
   if (e.target.closest("#undo")) undo();
   if (e.target.closest("#rep")) repeatOrDouble();
-  if (e.target.closest("#dealnow")) call("dealNow").catch((er) => flash(errMsg(er)));
 });
 async function doJoin(name) {
   if (joining) return; joining = true; gateErr = ""; render();
