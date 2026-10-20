@@ -44,9 +44,10 @@ function makeDb() {
     await prev;
     try {
       const writes = [];
+      const noWritesYet = () => { if (writes.length) throw new Error("Firestore transactions require all reads to be executed before all writes."); };
       const tx = {
-        get: async (r) => (r._q ? { docs: r.run() } : snap(r.path)),
-        getAll: async (...rs) => rs.map((r) => snap(r.path)),
+        get: async (r) => { noWritesYet(); return r._q ? { docs: r.run() } : snap(r.path); },
+        getAll: async (...rs) => { noWritesYet(); return rs.map((r) => snap(r.path)); },
         set: (r, d, o) => { writes.push(() => (o && o.merge ? setMerge(r.path, d) : apply(r.path, "set", d))); },
         update: (r, d) => { writes.push(() => apply(r.path, "update", d)); },
         delete: (r) => { writes.push(() => apply(r.path, "delete")); },

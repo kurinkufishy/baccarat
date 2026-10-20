@@ -187,3 +187,6 @@ exports.leave = onCall(async (req) => {
   });
   return { now: Date.now() };
 });
+
+// Blackjack table: shares the same players (and chips) as baccarat.
+Object.assign(exports, require("./blackjack")({ db, onCall, FieldValue, fail, requireUser, PLAYERS }));
