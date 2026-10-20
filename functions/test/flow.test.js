@@ -119,3 +119,29 @@ test("allow-list blocks strangers", async () => {
   await call("join", "a", { name: "あきら2" });
   db.docs.delete("config/access");
 });
+
+test("repay your own debt, or cover a friend's", async () => {
+  const P = (u) => db.docs.get("players/" + u);
+  await call("join", "c", { name: "し" });
+  await call("deposit", "c", { amount: 30000 });
+  const c0 = P("c").chips;
+  await rejects(call("repay", "c", { amount: 0 }), "invalid-argument");
+  await rejects(call("repay", "c", { amount: 30001 }), "failed-precondition");
+  await call("repay", "c", { amount: 10000 });
+  assert.strictEqual(P("c").dep, 20000);
+  assert.strictEqual(P("c").chips, c0 - 10000);
+  // a covers part of c's debt
+  const a0 = P("a").chips;
+  await rejects(call("repay", "a", { amount: 100, to: "nobody" }), "not-found");
+  await rejects(call("repay", "a", { amount: 100, to: "../x" }), "invalid-argument");
+  await call("repay", "a", { amount: 5000, to: "c" });
+  assert.strictEqual(P("a").chips, a0 - 5000);
+  assert.strictEqual(P("c").dep, 15000);
+  assert.strictEqual(P("c").helps[0].from, "a");
+  assert.strictEqual(P("c").helps[0].amount, 5000);
+  await rejects(call("repay", "a", { amount: P("a").chips + 1, to: "c" }), "failed-precondition");
+  // nobody can push someone's debt below zero
+  await rejects(call("repay", "a", { amount: 15001, to: "c" }), "failed-precondition");
+  db.docs.get("players/b").dep = 0;
+  await rejects(call("repay", "a", { amount: 1, to: "b" }), "failed-precondition");
+});

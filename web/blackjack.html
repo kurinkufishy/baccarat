@@ -50,7 +50,7 @@
   </div>
 
   <div class="chipbar" id="chipbar">
-    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div></div><button class="plus" id="walletbtn" aria-label="ウォレットを開いて入金" disabled>+</button></div>
+    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり）" disabled>+</button></div>
     <div class="mid" id="mid"></div>
     <div class="totbet"><span class="lb">ベット</span><span class="amt num" id="mytotal">0</span></div>
   </div>
@@ -58,13 +58,10 @@
 
 <div class="overlay" id="walletm" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
-    <div class="mhead"><span id="wt">ウォレット・入金</span><button class="x" data-close aria-label="閉じる">×</button></div>
-    <div class="sumline"><span>今の残高</span><span class="num" id="wbal">0</span></div>
-    <div class="packs" id="packs"></div>
-    <div><label class="flab" for="customdep">好きな額を入金（1回 1,000,000 まで）</label>
-      <div class="amtrow"><input id="customdep" inputmode="numeric" class="num" placeholder="例: 25000" autocomplete="off"></div></div>
-    <button class="go" id="depbtn" style="padding:14px">入金する</button>
-    <p class="small">チップは全部架空で、お金はかからないよ。入金した分は収支から差し引かれるので、ランキングは公平なまま。</p>
+    <div class="mhead"><span id="wt">ウォレット</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="wsum"><div><span>残高</span><b class="num" id="wbal">0</b></div><div><span>借金</span><b class="num" id="wdebt">0</b></div></div>
+    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button></div>
+    <div class="wbody" id="wbody"></div>
   </div>
 </div>
 
@@ -76,7 +73,7 @@
       <b>操作</b>　ヒット（もう1枚）／スタンド（止める）／ダブル（最初の2枚のときだけ。賭け金を2倍にして1枚だけ引く）。<br>
       <b>ディーラー</b>　17以上で止まる（ソフト17でも止まる）。表のカードがAか10のときはブラックジャックか確認して、そうならその場で終了。<br>
       <b>配当</b>　勝ち 1:1 ／ ブラックジャック 3:2 ／ 引き分けは返却。6デッキ使用。<br>
-      <b>チップ</b>　バカラと同じ残高を使う。シャッフル・配り・精算はすべてサーバーが行い、山札とディーラーの伏せ札は誰にも見えない。
+      <b>チップ</b>　バカラと同じ残高を使う。残高の「＋」から借りる・返す・友達の借金の肩代わりができる。シャッフル・配り・精算はすべてサーバーが行い、山札とディーラーの伏せ札は誰にも見えない。
     </div>
   </div>
 </div>

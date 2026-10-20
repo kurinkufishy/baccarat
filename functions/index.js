@@ -162,10 +162,35 @@ exports.dealNow = onCall(async (req) => {
 exports.deposit = onCall(async (req) => {
   const uid = requireUser(req);
   const amount = req.data && req.data.amount;
-  if (!Number.isSafeInteger(amount) || amount < 1 || amount > G.MAX_DEPOSIT) fail("invalid-argument", `入金は1〜${G.MAX_DEPOSIT.toLocaleString("ja-JP")}まで`);
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > G.MAX_DEPOSIT) fail("invalid-argument", `借りられるのは1回 1〜${G.MAX_DEPOSIT.toLocaleString("ja-JP")} まで`);
   await db.runTransaction(async (tx) => {
     await requirePlayer(tx, uid);
     tx.update(PLAYERS.doc(uid), { chips: FieldValue.increment(amount), dep: FieldValue.increment(amount) });
+  });
+  return { now: Date.now() };
+});
+
+/** Pay back debt (borrowed chips) from your own chips: yours, or a friend's ("to"). */
+exports.repay = onCall(async (req) => {
+  const uid = requireUser(req);
+  const amount = req.data && req.data.amount;
+  const to = (req.data && req.data.to) || uid;
+  if (!Number.isSafeInteger(amount) || amount < 1) fail("invalid-argument", "返す額がおかしいよ");
+  if (typeof to !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(to)) fail("invalid-argument", "相手がおかしいよ");
+  const now = Date.now();
+  await db.runTransaction(async (tx) => {
+    const ps = await tx.get(PLAYERS.doc(uid));
+    const qs = to === uid ? ps : await tx.get(PLAYERS.doc(to));
+    if (!ps.exists) fail("failed-precondition", "先に参加してね");
+    if (!qs.exists) fail("not-found", "相手が見つからないよ");
+    const debt = qs.data().dep || 0;
+    if (debt <= 0) fail("failed-precondition", to === uid ? "借金はないよ" : "その人に借金はないよ");
+    if (amount > debt) fail("failed-precondition", `借金（${debt.toLocaleString("ja-JP")}）より多くは返せないよ`);
+    if (amount > ps.data().chips) fail("failed-precondition", "チップが足りない");
+    tx.update(PLAYERS.doc(uid), { chips: FieldValue.increment(-amount) });
+    const upd = { dep: FieldValue.increment(-amount) };
+    if (to !== uid) upd.helps = [{ from: uid, amount, at: now }, ...(qs.data().helps || [])].slice(0, 5);
+    tx.update(PLAYERS.doc(to), upd);
   });
   return { now: Date.now() };
 });

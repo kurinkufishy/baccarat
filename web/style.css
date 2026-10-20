@@ -213,3 +213,18 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--go);outline-off
 .acct{display:flex;align-items:center;gap:6px}
 .acct img{width:22px;height:22px;border-radius:50%}
 a.ib{text-decoration:none}
+
+/* wallet */
+.wsum{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wsum div{background:var(--bg);border-radius:8px;padding:10px 12px}
+.wsum span{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.wsum b{font-size:18px}
+.wsum b.neg{color:#ff7a84}
+.wtabs{border-bottom:1px solid var(--line)}
+.wbody{display:flex;flex-direction:column;gap:12px}
+.wlist{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
+.wrow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;background:var(--panel2);border:2px solid transparent;border-radius:8px;padding:8px 10px;color:var(--text);cursor:pointer;text-align:left;font-weight:600}
+.wrow.on{border-color:var(--go)}
+.wrow .v{color:#ff9aa2;font-size:12px}
+.pack:disabled{opacity:.35;cursor:default}
+.debt{display:block;font-size:11px;color:#ff8a93;font-weight:700}

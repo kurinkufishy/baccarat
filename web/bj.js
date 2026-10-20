@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signI
 import { getFirestore, doc, collection, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js";
 import { firebaseConfig, functionsRegion } from "./firebase-config.js";
+import { setupWallet } from "./wallet.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
@@ -91,7 +92,7 @@ function addChip(v) {
   if (!players[me]) return;
   if (!bettingOpen()) { flash("ベット締切。次のゲームを待ってね"); return; }
   const cur = myBet(), free = myFree();
-  if (free <= 0) { flash("チップが足りない。残高の＋から入金できるよ"); return; }
+  if (free <= 0) { flash("チップが足りない。残高の＋から借りられるよ"); return; }
   const add = Math.min(v === "all" ? free : v, free, MAX_BET - cur);
   if (add <= 0) { flash("1回のベットは 10,000,000 まで"); return; }
   const next = cur + add;
@@ -445,27 +446,14 @@ function render() {
   const mine = (t.hands || []).find((h) => h.uid === me);
   $("mytotal").textContent = fmt(live ? (mine ? mine.bet : myBet()) : 0);
   $("walletbtn").disabled = !(live && players[me]);
+  const dbt = (players[me] && players[me].dep) || 0;
+  $("debt").hidden = !(live && dbt > 0); $("debt").textContent = `借金 ${fmt(dbt)}`;
+  if (live) { wallet.watch(); wallet.draw(); }
   renderGate(); renderSeats(); renderMid(); renderLists(); renderPill(); renderStats();
 }
 
-/* ================= wallet / account / rules ================= */
-const PACKS = [1000, 10000, 50000, 100000]; let pick = 10000, depositing = false;
-function drawWallet() {
-  $("wbal").textContent = fmt(myFree());
-  $("packs").innerHTML = PACKS.map((v) => `<button class="pack num ${v === pick ? "on" : ""}" data-v="${v}">${fmt(v)}</button>`).join("");
-  $("depbtn").disabled = !(pick > 0) || depositing;
-  $("depbtn").textContent = depositing ? "入金中…" : pick > 0 ? `${fmt(pick)} を入金する` : "金額を選んでね";
-}
-$("walletbtn").addEventListener("click", () => { if (!players[me]) return; $("walletm").hidden = false; pick = 10000; $("customdep").value = ""; drawWallet(); });
-$("packs").addEventListener("click", (e) => { const b = e.target.closest(".pack"); if (!b) return; pick = +b.dataset.v; $("customdep").value = ""; drawWallet(); });
-$("customdep").addEventListener("input", (e) => { pick = Math.min(MAX_DEPOSIT, +String(e.target.value).replace(/[^\d]/g, "") || 0); drawWallet(); });
-$("depbtn").addEventListener("click", async () => {
-  if (!(pick > 0) || depositing) return;
-  depositing = true; drawWallet();
-  try { await call("deposit", { amount: pick }); $("walletm").hidden = true; flash(`${fmt(pick)} 入金しました`); }
-  catch (e) { flash(errMsg(e)); }
-  depositing = false; drawWallet();
-});
+/* ================= wallet ================= */
+const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
 $("rulesbtn").addEventListener("click", () => { $("rulesm").hidden = false; });
