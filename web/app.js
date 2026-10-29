@@ -1,8 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { getFirestore, doc, collection, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getFunctions, httpsCallable, connectFunctionsEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js";
-import { firebaseConfig, functionsRegion } from "./firebase-config.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { firebaseConfig } from "./firebase-config.js";
+import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
@@ -32,36 +31,18 @@ function animMs(P, B) {
   return 200 + 4 * 860 + 250 + 4 * 740 + (nat ? 700 : 0) + (p - 2 + b - 2) * 3300 + 400;
 }
 
-/* ================= firebase ================= */
+/* ================= sign-in (Firebase Auth) + game server (Cloudflare) ================= */
 const configured = !String(firebaseConfig.apiKey || "").startsWith("PASTE");
-const emu = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("emu");
-let auth, fs, fns;
-if (configured || emu) {
-  const app = initializeApp(emu && !configured ? { apiKey: "demo", authDomain: "localhost", projectId: "demo-baccarat", appId: "demo" } : firebaseConfig);
-  auth = getAuth(app); fs = getFirestore(app); fns = getFunctions(app, functionsRegion);
-  if (emu) {
-    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-    connectFirestoreEmulator(fs, "127.0.0.1", 8080);
-    connectFunctionsEmulator(fns, "127.0.0.1", 5001);
-    // Test hook, only on localhost with ?emu: sign in with a fake Google account.
-    window.__emuSignIn = (email) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub: email.replace(/\W/g, ""), email, email_verified: true, name: email })));
-  }
-}
-let offset = 0; // server clock - local clock
-const sNow = () => Date.now() + offset;
-async function call(name, data) {
-  const t0 = Date.now();
-  const r = await httpsCallable(fns, name)(data || {});
-  const t1 = Date.now();
-  if (r.data && r.data.now) offset = r.data.now - (t0 + t1) / 2;
-  return r.data;
-}
-const errMsg = (e) => (e && e.message && !/^internal$/i.test(e.message) ? e.message : "うまくいかなかった。もう一度試してね");
+const auth = configured ? getAuth(initializeApp(firebaseConfig)) : null;
+let conn = null, online = false, importAvail = false, importing = false;
+const sNow = () => Date.now() + (conn ? conn.offset() : 0);
+const call = (name, data) => (conn ? conn.call(name, data) : Promise.reject(new Error("接続中…少し待ってね")));
+const errMsg = (e) => (e && e.message ? e.message : "うまくいかなかった。もう一度試してね");
 
 /* ================= state ================= */
 let user = null, me = null, gate = "loading", gateErr = "";
 let state = fresh(), players = {}, betsMap = {}, myDocExists = null;
-let memberUnsubs = [], myUnsub = null, firstState = true;
+let firstState = true;
 let want = null, ackWant = null, sending = false;
 let amount = 1000, animating = false, animatedDeal = null, animState = null, revealedRound = 0;
 let shownP = [], shownB = [], bannerMsg = "";
@@ -445,6 +426,7 @@ function renderGate() {
       <p class="err">${esc(gateErr)}</p>`;
   else if (gate === "join") h = `<h1>BACCARAT</h1><p>テーブルで使うニックネームを決めてね。<br>最初に 10,000 チップもらえるよ。</p>
       <form class="join" id="gjoin"><input id="gname" placeholder="ニックネーム" maxlength="12" autocomplete="off" value="${esc((user && user.displayName || "").slice(0, 12))}"><button class="go" type="submit" ${joining ? "disabled" : ""}>参加</button></form>
+      ${importAvail ? `<div class="mig"><p>前のサーバーで遊んでた人は、先に<b>前のチップと借金を引き継いで</b>ね。</p><button class="gbtn" id="gimport" ${importing ? "disabled" : ""}>${importing ? "引き継ぎ中…" : "前のデータを引き継ぐ"}</button></div>` : ""}
       <p class="err">${esc(gateErr)}</p><button class="ib" id="gout" style="align-self:center">別のアカウントにする</button>`;
   if (box.dataset.k !== h) { box.innerHTML = h; box.dataset.k = h; }
   const a = $("acctbtn");
@@ -455,7 +437,11 @@ function render() {
   const list = seatList();
   const live = gate === "in";
   $("live").classList.toggle("on", live);
-  $("livetxt").textContent = live ? "LIVE" : gate === "out" || gate === "join" ? "ログイン前" : "接続中";
+  $("live").classList.toggle("on", live && online);
+  $("livetxt").textContent = live ? (online ? "LIVE" : "再接続中…") : gate === "out" || gate === "join" ? "ログイン前" : "接続中";
+  const mb = $("migbar");
+  mb.hidden = !(live && importAvail);
+  if (!mb.hidden) { const k = importing ? "1" : "0"; if (mb.dataset.k !== k) { mb.dataset.k = k; mb.innerHTML = `<span>前のサーバーのチップと借金がまだ引き継がれてないよ。前に遊んでた人なら押してね。</span><button class="go" id="mimport" ${importing ? "disabled" : ""}>${importing ? "引き継ぎ中…" : "引き継ぐ"}</button>`; } }
   $("roundtxt").textContent = live ? `#${state.round}` : "";
   $("bal").textContent = live && players[me] ? fmt(myFree()) : "—";
   $("mytotal").textContent = fmt(live ? myStake() : 0);
@@ -536,6 +522,7 @@ $("mid").addEventListener("submit", (e) => { e.preventDefault(); const n = $("jo
 $("gatebox").addEventListener("submit", (e) => { e.preventDefault(); const n = $("gname").value.trim(); if (n) doJoin(n); });
 $("gatebox").addEventListener("click", async (e) => {
   if (e.target.closest("#gout")) { signOut(auth); return; }
+  if (e.target.closest("#gimport")) { doImport(); return; }
   if (!e.target.closest("#gsign")) return;
   gateErr = ""; const btn = e.target.closest("#gsign"); btn.disabled = true;
   const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
@@ -550,64 +537,58 @@ $("sidebtn").addEventListener("click", () => { sideOpen = !sideOpen; render(); }
 document.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; render(); } });
 
 /* ================= realtime ================= */
-function stopMember() { memberUnsubs.forEach((u) => u()); memberUnsubs = []; }
-function startMember() {
-  if (memberUnsubs.length) return;
-  firstState = true;
-  memberUnsubs.push(onSnapshot(doc(fs, "tables/main"), (s) => {
-    const d = s.exists() ? s.data() : fresh();
-    const prevRound = state.round;
-    state = d;
-    if (prevRound !== d.round) { want = null; ackWant = null; }
-    if (firstState) {
-      firstState = false; animatedDeal = d.dealId;
-      revealedRound = d.phase === "result" ? d.round : d.round - 1;
-    } else if (d.phase === "result" && d.dealId !== animatedDeal) {
-      animatedDeal = d.dealId;
-      if (document.visibilityState === "visible" && sNow() - (d.dealtAt || 0) < animMs(d.P, d.B)) { animate(d); return; }
-      revealedRound = Math.max(revealedRound, d.round);
-    } else if (d.phase !== "result" && !animating) revealedRound = Math.max(revealedRound, d.round - 1);
-    render();
-  }, onListenErr));
-  memberUnsubs.push(onSnapshot(collection(fs, "players"), (q) => {
-    const next = {}; q.docs.forEach((x) => { next[x.id] = x.data(); }); players = next; render();
-  }, onListenErr));
-  memberUnsubs.push(onSnapshot(collection(fs, "tables/main/bets"), (q) => {
-    const next = {}; q.docs.forEach((x) => { next[x.id] = x.data(); }); betsMap = next;
-    if (ackWant && sameBets(ackWant, serverMyBets())) ackWant = null;
-    render();
-  }, onListenErr));
-  call("tick").catch(() => {});
+function setTable(d) {
+  const prevRound = state.round;
+  state = d || fresh();
+  if (prevRound !== state.round) { want = null; ackWant = null; }
+  if (firstState) {
+    firstState = false; animatedDeal = state.dealId;
+    revealedRound = state.phase === "result" ? state.round : state.round - 1;
+  } else if (state.phase === "result" && state.dealId !== animatedDeal) {
+    animatedDeal = state.dealId;
+    if (document.visibilityState === "visible" && sNow() - (state.dealtAt || 0) < animMs(state.P, state.B)) { animate(state); return; }
+    revealedRound = Math.max(revealedRound, state.round);
+  } else if (state.phase !== "result" && !animating) revealedRound = Math.max(revealedRound, state.round - 1);
 }
-function onListenErr(e) { console.warn(e); flash("接続が切れました。ページを再読み込みしてね"); }
+function applyBatch(msgs) {
+  for (const m of msgs) {
+    if (m.type === "bac") setTable(m.v);
+    else if (m.type === "bacBets") { betsMap = m.v || {}; if (ackWant && sameBets(ackWant, serverMyBets())) ackWant = null; }
+    else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
+    else if (m.type === "meta") importAvail = !(m.v && m.v.imported);
+    else if (m.type === "notice") flash(m.text);
+  }
+  render();
+}
+function onReady(st, uid) {
+  me = uid; players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
+  firstState = true; setTable(st.bac);
+  gate = players[me] ? "in" : "join";
+  render();
+}
+async function doImport() {
+  if (importing || !user) return;
+  importing = true; render();
+  try { const r = await call("import", { token: await user.getIdToken() }); flash(`${r.count}人分のチップと借金を引き継いだよ`); }
+  catch (e) { flash(errMsg(e)); gateErr = errMsg(e); }
+  importing = false; render();
+}
 
 if (!auth) { gate = "unconfigured"; render(); }
 else onAuthStateChanged(auth, (u) => {
   user = u; me = u ? u.uid : null;
-  if (myUnsub) { myUnsub(); myUnsub = null; }
-  stopMember(); players = {}; betsMap = {}; state = fresh(); want = null; ackWant = null;
+  if (conn) { conn.close(); conn = null; }
+  players = {}; betsMap = {}; state = fresh(); want = null; ackWant = null; online = false;
   if (!u) { gate = "out"; render(); return; }
   gate = "loading"; render();
-  myUnsub = onSnapshot(doc(fs, "players/" + u.uid), (s) => {
-    if (s.exists()) { players[me] = s.data(); if (gate !== "in") { gate = "in"; startMember(); } }
-    else { gate = "join"; stopMember(); }
-    render();
-  }, (e) => { console.warn(e); gate = "join"; render(); });
+  conn = connect({ getToken: () => u.getIdToken(), onReady, onBatch: applyBatch, onStatus: (on, err) => { online = on; if (err && gate === "loading") gateErr = err; render(); } });
 });
 
-/* ================= clock: ask the server to move the table on ================= */
-let lastTick = 0;
-setInterval(() => {
-  renderTimer();
-  if (gate !== "in" || document.visibilityState !== "visible") return;
-  const now = sNow(), local = Date.now();
-  if (local - lastTick < 1500) return;
-  let due = false;
-  if (state.phase === "betting") due = !state.closesAt || now >= state.closesAt + 150;
-  else if (state.phase === "result" && !animating) due = now >= (state.dealtAt || 0) + animMs(state.P || [], state.B || []) + HOLD_MS + 150;
-  if (due) { lastTick = local + Math.random() * 400; call("tick").catch(() => {}); }
-}, 250);
+/* ================= clock: the server moves the table on by itself; this only redraws the timer ================= */
+setInterval(renderTimer, 250);
 
 /* ================= boot ================= */
 new ResizeObserver(() => { if (animating) return; layout(); cardsKey = ""; renderCards(); }).observe($("stage"));
 layout(); render();
+
+$("migbar").addEventListener("click", (e) => { if (e.target.closest("#mimport")) doImport(); });

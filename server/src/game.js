@@ -1,5 +1,9 @@
-// Pure game logic shared by the Cloud Functions and the tests. No Firebase imports here.
-const crypto = require("node:crypto");
+// Baccarat rules (ported from functions/game.js). Pure; no platform APIs except Web Crypto.
+/** Uniform integer in [0, n) from the Web Crypto RNG (rejection sampling, no modulo bias). */
+export function randomInt(n) {
+  const max = Math.floor(0x100000000 / n) * n, buf = new Uint32Array(1);
+  for (;;) { crypto.getRandomValues(buf); if (buf[0] < max) return buf[0] % n; }
+}
 
 const START = 10000;          // chips every new player starts with
 const BET_MS = 15000;         // betting window
@@ -19,7 +23,7 @@ const tot = (h) => h.reduce((a, c) => a + cv(c), 0) % 10;
 function newShoe() {
   const a = [];
   for (let d = 0; d < 8; d++) for (const s of "SHDC") for (const r of RK) a.push(r + s);
-  for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
   return a.join("");
 }
 
@@ -85,4 +89,4 @@ function cleanName(n) {
   return s;
 }
 
-module.exports = { START, BET_MS, HOLD_MS, IDLE_LIMIT, MAX_SPOT, MAX_DEPOSIT, SPOTS, emptyBets, sum, cv, tot, newShoe, dealCoup, payout, animMs, cleanBets, cleanName };
+export { START, BET_MS, HOLD_MS, IDLE_LIMIT, MAX_SPOT, MAX_DEPOSIT, SPOTS, emptyBets, sum, cv, tot, newShoe, dealCoup, payout, animMs, cleanBets, cleanName };

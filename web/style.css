@@ -228,3 +228,9 @@ a.ib{text-decoration:none}
 .wrow .v{color:#ff9aa2;font-size:12px}
 .pack:disabled{opacity:.35;cursor:default}
 .debt{display:block;font-size:11px;color:#ff8a93;font-weight:700}
+
+/* migration from the old server */
+.migbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#2a2410;border:1px solid var(--gold2);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6}
+.migbar .go{padding:8px 16px}
+.mig{background:rgba(217,181,107,.1);border:1px solid rgba(217,181,107,.35);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.mig p{margin:0;font-size:12px}

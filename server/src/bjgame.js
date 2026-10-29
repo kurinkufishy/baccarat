@@ -1,5 +1,5 @@
-// Pure blackjack rules for the shared table. No Firebase imports here.
-const crypto = require("node:crypto");
+// Blackjack rules (ported from functions/bjgame.js).
+import { randomInt } from "./game.js";
 
 const BJ = {
   DECKS: 6,
@@ -18,7 +18,7 @@ const RK = "A23456789TJQK";
 function newShoe(decks = BJ.DECKS) {
   const a = [];
   for (let d = 0; d < decks; d++) for (const s of "SHDC") for (const r of RK) a.push(r + s);
-  for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
   return a.join("");
 }
 const rankValue = (c) => { const i = RK.indexOf(c[0]); return i === 0 ? 1 : i >= 9 ? 10 : i + 1; };
@@ -59,4 +59,4 @@ function cleanBet(v) {
   return v;
 }
 
-module.exports = { BJ, newShoe, rankValue, total, isBlackjack, dealerDraws, settle, cleanBet };
+export { BJ, newShoe, rankValue, total, isBlackjack, dealerDraws, settle, cleanBet };
