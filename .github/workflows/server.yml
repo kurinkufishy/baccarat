@@ -1,8 +1,9 @@
-name: Test server logic
+name: Test game server
 
+# Deploys are done by Cloudflare Workers Builds (connected to this repo, root directory "server").
 on:
   push:
-    paths: ["functions/**", ".github/workflows/test.yml"]
+    paths: ["server/**", ".github/workflows/server.yml"]
   pull_request:
   workflow_dispatch:
 
@@ -14,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: functions
+        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: functions/package-lock.json
+          cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm test
