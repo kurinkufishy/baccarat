@@ -1,8 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCredential, onAuthStateChanged, signOut, connectAuthEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import { getFirestore, doc, collection, onSnapshot, connectFirestoreEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { getFunctions, httpsCallable, connectFunctionsEmulator } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js";
-import { firebaseConfig, functionsRegion } from "./firebase-config.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import { firebaseConfig } from "./firebase-config.js";
+import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
@@ -22,35 +21,17 @@ const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const wait = (ms) => new Promise((r) => setTimeout(r, reduced() ? Math.min(ms, 40) : ms));
 const chipColor = (v) => { let c = CHIPS[0].c; for (const x of CHIPS) if (v >= x.v) c = x.c; return c; };
 
-/* ================= firebase ================= */
+/* ================= sign-in (Firebase Auth) + game server (Cloudflare) ================= */
 const configured = !String(firebaseConfig.apiKey || "").startsWith("PASTE");
-const emu = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("emu");
-let auth, fs, fns;
-if (configured || emu) {
-  const app = initializeApp(emu && !configured ? { apiKey: "demo", authDomain: "localhost", projectId: "demo-baccarat", appId: "demo" } : firebaseConfig);
-  auth = getAuth(app); fs = getFirestore(app); fns = getFunctions(app, functionsRegion);
-  if (emu) {
-    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-    connectFirestoreEmulator(fs, "127.0.0.1", 8080);
-    connectFunctionsEmulator(fns, "127.0.0.1", 5001);
-    window.__emuSignIn = (email) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub: email.replace(/\W/g, ""), email, email_verified: true, name: email })));
-  }
-}
-let offset = 0;
-const sNow = () => Date.now() + offset;
-async function call(name, data) {
-  const t0 = Date.now();
-  const r = await httpsCallable(fns, name)(data || {});
-  const t1 = Date.now();
-  if (r.data && r.data.now) offset = r.data.now - (t0 + t1) / 2;
-  return r.data;
-}
-const errMsg = (e) => (e && e.message && !/^internal$/i.test(e.message) ? e.message : "うまくいかなかった。もう一度試してね");
+const auth = configured ? getAuth(initializeApp(firebaseConfig)) : null;
+let conn = null, online = false, importAvail = false, importing = false;
+const sNow = () => Date.now() + (conn ? conn.offset() : 0);
+const call = (name, data) => (conn ? conn.call(name, data) : Promise.reject(new Error("接続中…少し待ってね")));
+const errMsg = (e) => (e && e.message ? e.message : "うまくいかなかった。もう一度試してね");
 
 /* ================= state ================= */
 let user = null, me = null, gate = "loading", gateErr = "", joining = false;
 let t = fresh(), players = {}, bets = {}, firstState = true;
-let memberUnsubs = [], myUnsub = null;
 let want = null, ackWant = null, sending = false, lastBase = 0;
 let chipSel = 1000, acting = false, actedSeq = -1, statsOpen = false;
 let animating = 0, bannerMsg = "";
@@ -431,6 +412,7 @@ function renderGate() {
       <p class="err">${esc(gateErr)}</p>`;
   else if (gate === "join") h = `<h1>BLACKJACK</h1><p>テーブルで使うニックネームを決めてね。<br>最初に 10,000 チップもらえるよ（バカラと共通）。</p>
       <form class="join" id="gjoin"><input id="gname" placeholder="ニックネーム" maxlength="12" autocomplete="off" value="${esc((user && user.displayName || "").slice(0, 12))}"><button class="go" type="submit" ${joining ? "disabled" : ""}>参加</button></form>
+      ${importAvail ? `<div class="mig"><p>前のサーバーで遊んでた人は、先に<b>前のチップと借金を引き継いで</b>ね。</p><button class="gbtn" id="gimport" ${importing ? "disabled" : ""}>${importing ? "引き継ぎ中…" : "前のデータを引き継ぐ"}</button></div>` : ""}
       <p class="err">${esc(gateErr)}</p><button class="ib" id="gout" style="align-self:center">別のアカウントにする</button>`;
   if (box.dataset.k !== h) { box.innerHTML = h; box.dataset.k = h; }
   const a = $("acctbtn"); a.hidden = !user;
@@ -439,7 +421,11 @@ function renderGate() {
 function render() {
   const live = gate === "in";
   $("live").classList.toggle("on", live);
-  $("livetxt").textContent = live ? "LIVE" : gate === "out" || gate === "join" ? "ログイン前" : "接続中";
+  $("live").classList.toggle("on", live && online);
+  $("livetxt").textContent = live ? (online ? "LIVE" : "再接続中…") : gate === "out" || gate === "join" ? "ログイン前" : "接続中";
+  const mb = $("migbar");
+  mb.hidden = !(live && importAvail);
+  if (!mb.hidden) { const k = importing ? "1" : "0"; if (mb.dataset.k !== k) { mb.dataset.k = k; mb.innerHTML = `<span>前のサーバーのチップと借金がまだ引き継がれてないよ。前に遊んでた人なら押してね。</span><button class="go" id="mimport" ${importing ? "disabled" : ""}>${importing ? "引き継ぎ中…" : "引き継ぐ"}</button>`; } }
   $("roundtxt").textContent = live ? `#${t.round}` : "";
   $("statsbtn").hidden = !live;
   $("bal").textContent = live && players[me] ? fmt(myFree()) : "—";
@@ -523,6 +509,7 @@ async function doJoin(name) {
 $("gatebox").addEventListener("submit", (e) => { e.preventDefault(); const n = $("gname").value.trim(); if (n) doJoin(n); });
 $("gatebox").addEventListener("click", async (e) => {
   if (e.target.closest("#gout")) { signOut(auth); return; }
+  if (e.target.closest("#gimport")) { doImport(); return; }
   if (!e.target.closest("#gsign")) return;
   gateErr = ""; const btn = e.target.closest("#gsign"); btn.disabled = true;
   const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: "select_account" });
@@ -535,57 +522,55 @@ $("gatebox").addEventListener("click", async (e) => {
 });
 
 /* ================= realtime ================= */
-function stopMember() { memberUnsubs.forEach((u) => u()); memberUnsubs = []; }
-function startMember() {
-  if (memberUnsubs.length) return;
-  firstState = true;
-  memberUnsubs.push(onSnapshot(doc(fs, "tables/bj"), (s) => {
-    const prevRound = t.round;
-    t = s.exists() ? s.data() : fresh();
-    if (prevRound !== t.round) { want = null; ackWant = null; }
-    const instant = firstState || document.visibilityState !== "visible";
-    firstState = false;
-    sync(instant); render();
-  }, onListenErr));
-  memberUnsubs.push(onSnapshot(collection(fs, "players"), (q) => { const n = {}; q.docs.forEach((x) => { n[x.id] = x.data(); }); players = n; render(); }, onListenErr));
-  memberUnsubs.push(onSnapshot(collection(fs, "tables/bj/bets"), (q) => {
-    const n = {}; q.docs.forEach((x) => { n[x.id] = x.data(); }); bets = n;
-    if (ackWant !== null && ackWant === serverBet()) ackWant = null;
-    render();
-  }, onListenErr));
-  call("bjTick").catch(() => {});
+function setTable(v) {
+  const prevRound = t.round;
+  t = v || fresh();
+  if (prevRound !== t.round) { want = null; ackWant = null; }
+  const instant = firstState || document.visibilityState !== "visible";
+  firstState = false;
+  sync(instant);
 }
-function onListenErr(e) { console.warn(e); flash("接続が切れました。ページを再読み込みしてね"); }
+function applyBatch(msgs) {
+  for (const m of msgs) {
+    if (m.type === "bj") setTable(m.v);
+    else if (m.type === "bjBets") { bets = m.v || {}; if (ackWant !== null && ackWant === serverBet()) ackWant = null; }
+    else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
+    else if (m.type === "meta") importAvail = !(m.v && m.v.imported);
+    else if (m.type === "notice") flash(m.text);
+  }
+  render();
+}
+function onReady(st, uid) {
+  me = uid; players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
+  Object.keys(els).forEach((k) => { els[k].remove(); delete els[k]; });
+  firstState = true; setTable(st.bj);
+  gate = players[me] ? "in" : "join";
+  render();
+}
+async function doImport() {
+  if (importing || !user) return;
+  importing = true; render();
+  try { const r = await call("import", { token: await user.getIdToken() }); flash(`${r.count}人分のチップと借金を引き継いだよ`); }
+  catch (e) { flash(errMsg(e)); gateErr = errMsg(e); }
+  importing = false; render();
+}
 
 if (!auth) { gate = "unconfigured"; render(); }
 else onAuthStateChanged(auth, (u) => {
   user = u; me = u ? u.uid : null;
-  if (myUnsub) { myUnsub(); myUnsub = null; }
-  stopMember(); players = {}; bets = {}; t = fresh(); want = null; ackWant = null;
+  if (conn) { conn.close(); conn = null; }
+  players = {}; bets = {}; t = fresh(); want = null; ackWant = null; online = false;
   Object.keys(els).forEach((k) => { els[k].remove(); delete els[k]; });
   if (!u) { gate = "out"; render(); return; }
   gate = "loading"; render();
-  myUnsub = onSnapshot(doc(fs, "players/" + u.uid), (s) => {
-    if (s.exists()) { players[me] = s.data(); if (gate !== "in") { gate = "in"; startMember(); } }
-    else { gate = "join"; stopMember(); }
-    render();
-  }, () => { gate = "join"; render(); });
+  conn = connect({ getToken: () => u.getIdToken(), onReady, onBatch: applyBatch, onStatus: (on, err) => { online = on; if (err && gate === "loading") gateErr = err; render(); } });
 });
 
-/* ================= clock: ask the server to move the table on ================= */
-let lastTick = 0;
-setInterval(() => {
-  renderPill();
-  if (gate !== "in" || document.visibilityState !== "visible") return;
-  const now = sNow(), local = Date.now();
-  if (local - lastTick < 1500) return;
-  let due = false;
-  if (t.phase === "betting") due = !t.closesAt || now >= t.closesAt + 150;
-  else if (t.phase === "playing") due = now > t.turnEndsAt + GRACE_MS + 150;
-  else if (t.phase === "result" && !animating) due = now >= (t.animUntil || 0) + HOLD_MS + 150;
-  if (due) { lastTick = local + Math.random() * 400; call("bjTick").catch(() => {}); }
-}, 250);
+/* ================= clock: the server moves the table on by itself; this only redraws the timer ================= */
+setInterval(renderPill, 250);
 
 /* ================= boot ================= */
 new ResizeObserver(() => { if (animating) return; layout(); Object.keys(els).forEach(placeEl); seatsKey = ""; badgeKey = ""; render(); }).observe($("stage"));
 layout(); render();
+
+$("migbar").addEventListener("click", (e) => { if (e.target.closest("#mimport")) doImport(); });
