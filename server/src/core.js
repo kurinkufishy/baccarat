@@ -34,6 +34,7 @@ export class Core {
       case "leave": return this.leave(uid, now);
       case "deposit": return this.deposit(uid, m.amount);
       case "repay": return this.repay(uid, m.amount, m.to, now);
+      case "give": return this.give(uid, m.amount, m.to, now);
       case "bjBet": return this.bjBet(uid, m.amount, m.round, now);
       case "bjAct": return this.bjAct(uid, m.action, m.round, m.turn, now);
       default: fail("その操作はできないよ");
@@ -73,6 +74,19 @@ export class Core {
     if (amount > p.chips) fail("チップが足りない");
     p.chips -= amount; q.dep = debt - amount;
     if (to !== uid) q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5);
+    this.mark("p:" + uid, "p:" + to);
+  }
+
+  /** Hand some of my own chips to a friend. */
+  give(uid, amount, to, now) {
+    if (!isInt(amount) || amount < 1) fail("あげる額がおかしいよ");
+    if (typeof to !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(to)) fail("相手がおかしいよ");
+    if (to === uid) fail("自分にはあげられないよ");
+    const p = this.player(uid), q = this.d.players[to];
+    if (!q) fail("相手が見つからないよ");
+    if (amount > p.chips) fail("チップが足りない（ベット中の分は使えないよ）");
+    p.chips -= amount; q.chips += amount;
+    q.gifts = [{ from: uid, amount, at: now }, ...(q.gifts || [])].slice(0, 5);
     this.mark("p:" + uid, "p:" + to);
   }
 

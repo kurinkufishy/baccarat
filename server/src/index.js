@@ -8,7 +8,7 @@ import { readOldData } from "./firestore.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "bjBet", "bjAct"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct"]);
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
 function originOk(req, env) {

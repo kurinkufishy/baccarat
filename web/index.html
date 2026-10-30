@@ -60,7 +60,7 @@
   </div>
 
   <div class="chipbar" id="chipbar">
-    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり）" disabled>+</button></div>
+    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり・あげる）" disabled>+</button></div>
     <div class="mid" id="mid"></div>
     <div class="totbet"><span class="lb">トータルベット</span><span class="amt num" id="mytotal">0</span></div>
   </div>
@@ -70,7 +70,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
     <div class="mhead"><span id="wt">ウォレット</span><button class="x" data-close aria-label="閉じる">×</button></div>
     <div class="wsum"><div><span>残高</span><b class="num" id="wbal">0</b></div><div><span>借金</span><b class="num" id="wdebt">0</b></div></div>
-    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button></div>
+    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button><button data-w="give" role="tab">あげる</button></div>
     <div class="wbody" id="wbody"></div>
   </div>
 </div>
@@ -83,7 +83,7 @@
       <b>点数</b>　A=1、10・絵札=0、合計の下一桁が9に近い方が勝ち。最初の2枚で8か9ならナチュラルで終了。プレイヤーは0〜5で3枚目を引き、バンカーはプレイヤーの3枚目に応じて正式ルール通り引く。<br>
       <b>配当</b>　プレイヤー 1:1 ／ バンカー 0.95:1 ／ タイ 8:1（P・Bのベットは返却）／ ペア 11:1。8デッキ使用。<br>
       <b>公平さ</b>　シャッフル・配り・精算はすべてサーバーが行い、山札は誰にも見えない。<br>
-      <b>チップ</b>　全部架空で1人10,000スタート。残高の「＋」から借りられる。借りた分は借金になって収支から引かれ、返したり友達の借金を肩代わりしたりもできる。
+      <b>チップ</b>　全部架空で1人10,000スタート。残高の「＋」から借りられる。借りた分は借金になって収支から引かれ、返したり友達の借金を肩代わりしたり、自分のチップを友達にあげたりもできる。
     </div>
   </div>
 </div>

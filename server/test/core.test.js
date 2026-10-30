@@ -212,3 +212,23 @@ test("importing old data once, with held bets returned", () => {
   assert.equal(c.d.players.new1.chips, 10000);
   assert.throws(() => c.importPlayers({}, {}), /もう終わって/);
 });
+
+test("giving chips to a friend from your own balance", () => {
+  const c = new Core(freshData());
+  const g = (uid, m) => c.handle(uid, "", "give", m, 7);
+  c.handle("a", "", "join", { name: "a" }, 0); c.handle("b", "", "join", { name: "b" }, 0);
+  assert.throws(() => g("a", { amount: 0, to: "b" }));
+  assert.throws(() => g("a", { amount: 1.5, to: "b" }));
+  assert.throws(() => g("a", { amount: "100", to: "b" }));
+  assert.throws(() => g("a", { amount: 100, to: "a" }), /自分/);
+  assert.throws(() => g("a", { amount: 100, to: "nobody" }), /見つから/);
+  assert.throws(() => g("a", { amount: 100, to: "../b" }));
+  assert.throws(() => g("a", { amount: 10001, to: "b" }), /足りない/);
+  c.handle("a", "", "setBets", { bets: { player: 4000 }, round: 1 }, 0);
+  assert.throws(() => g("a", { amount: 6001, to: "b" }), /足りない/, "chips held in a bet can't be given");
+  g("a", { amount: 6000, to: "b" });
+  assert.equal(c.d.players.a.chips, 0);
+  assert.equal(c.d.players.b.chips, 16000);
+  assert.deepEqual(c.d.players.b.gifts[0], { from: "a", amount: 6000, at: 7 });
+  assert.equal(c.d.players.a.dep, 0, "giving is not borrowing");
+});

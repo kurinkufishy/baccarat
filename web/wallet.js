@@ -1,4 +1,4 @@
-// Wallet shared by the baccarat and blackjack pages: borrow chips, pay back your debt, or cover a friend's.
+// Wallet shared by the baccarat and blackjack pages: borrow chips, pay back your debt, cover a friend's, or give chips away.
 const MAX_BORROW = 1000000;
 
 export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, myFree }) {
@@ -8,23 +8,34 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
   const me = () => getPlayers()[getMe()];
   const debt = () => (me() && me().dep) || 0;
   const debtors = () => Object.entries(getPlayers()).filter(([id, p]) => id !== getMe() && (p.dep || 0) > 0).sort((a, b) => b[1].dep - a[1].dep);
+  const others = () => Object.entries(getPlayers()).filter(([id]) => id !== getMe()).sort((a, b) => (b[1].seated - a[1].seated) || (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
+  const list = () => (tab === "help" ? debtors() : others());
   function max() {
     if (tab === "borrow") return MAX_BORROW;
     if (tab === "repay") return Math.min(myFree(), debt());
     const p = target && getPlayers()[target];
-    return p ? Math.min(myFree(), p.dep || 0) : 0;
+    if (!p) return 0;
+    return tab === "give" ? myFree() : Math.min(myFree(), p.dep || 0);
   }
+  const rows = (ds, label, right, cls = "") => `<div class="wlist" role="radiogroup" aria-label="${label}">${ds.map(([id, q]) => `<button class="wrow ${id === target ? "on" : ""}" data-t="${esc(id)}" role="radio" aria-checked="${id === target}"><span class="dot" style="background:${esc(q.color)}">${esc((q.name || "?")[0])}</span><span class="n">${esc(q.name)}</span><span class="v num ${cls}">${right(q)}</span></button>`).join("")}</div>`;
+  const btnText = (p) => {
+    const tn = esc(getPlayers()[target]?.name || "");
+    if (tab === "borrow") return `${fmt(p)} を借りる`;
+    if (tab === "repay") return `${fmt(p)} を返す`;
+    if (tab === "help") return `${tn} の借金を ${fmt(p)} 肩代わり`;
+    return `${tn} に ${fmt(p)} あげる`;
+  };
   const packs = (list) => `<div class="packs">${list.map(([v, l]) => `<button class="pack num ${v === pick ? "on" : ""}" data-v="${v}" ${v > 0 ? "" : "disabled"}>${l || fmt(v)}</button>`).join("")}</div>`;
   const payPacks = (m) => packs([...[1000, 10000, 50000].filter((v) => v < m).map((v) => [v]), [m, "全額 " + fmt(m)]]);
   const amountBox = (label) => `<div><label class="flab" for="wamt">${label}</label><div class="amtrow"><input id="wamt" inputmode="numeric" class="num" placeholder="金額を入れる" autocomplete="off" value="${pick && ![1000, 10000, 50000, 100000].includes(pick) ? pick : ""}"></div></div>`;
 
   function ensureTarget() {
-    const ds = debtors();
-    if (ds.length && (!target || !ds.some(([id]) => id === target))) target = ds[0][0];
+    const ds = list();
+    if (!target || !ds.some(([id]) => id === target)) target = ds.length ? ds[0][0] : null;
   }
   function draw() {
     if ($("walletm").hidden) return;
-    if (tab === "help") ensureTarget();
+    if (tab === "help" || tab === "give") ensureTarget();
     $("wbal").textContent = fmt(myFree());
     $("wdebt").textContent = fmt(debt());
     $("wdebt").classList.toggle("neg", debt() > 0);
@@ -42,15 +53,21 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
           + `<p class="small">残高から借金を返す。返した分だけ借金が減って、収支は変わらないよ。</p>`;
         ok = p > 0; btn = ok ? `${fmt(p)} を返す` : "残高が足りないよ";
       }
-    } else {
+    } else if (tab === "help") {
       const ds = debtors();
       if (!ds.length) h = `<div class="empty">借金してる人はいないよ</div>`;
       else {
-        h = `<div class="wlist" role="radiogroup" aria-label="肩代わりする相手">${ds.map(([id, q]) => `<button class="wrow ${id === target ? "on" : ""}" data-t="${esc(id)}" role="radio" aria-checked="${id === target}"><span class="dot" style="background:${esc(q.color)}">${esc((q.name || "?")[0])}</span><span class="n">${esc(q.name)}</span><span class="v num">借金 ${fmt(q.dep)}</span></button>`).join("")}</div>`
-          + payPacks(m) + amountBox("肩代わりする額")
+        h = rows(ds, "肩代わりする相手", (q) => `借金 ${fmt(q.dep)}`) + payPacks(m) + amountBox("肩代わりする額")
           + `<p class="small">自分の残高で相手の借金を払う。相手の借金が減って、自分の収支はその分マイナスになるよ。</p>`;
-        const tn = getPlayers()[target]?.name || "";
-        ok = p > 0; btn = ok ? `${esc(tn)} の借金を ${fmt(p)} 肩代わり` : "残高が足りないよ";
+        ok = p > 0; btn = ok ? btnText(p) : "残高が足りないよ";
+      }
+    } else {
+      const ds = others();
+      if (!ds.length) h = `<div class="empty">まだほかに誰もいないよ</div>`;
+      else {
+        h = rows(ds, "あげる相手", (q) => `残高 ${fmt(q.chips)}`, "plain") + payPacks(m) + amountBox("あげる額")
+          + `<p class="small">自分の残高から相手にチップをあげる。借金にはならないけど、自分の収支はその分マイナス、相手はプラスになるよ。ベット中のチップはあげられない。</p>`;
+        ok = p > 0; btn = ok ? btnText(p) : "残高が足りないよ";
       }
     }
     const key = tab + "|" + h;
@@ -60,7 +77,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
 
   function open() { if (!me()) return; tab = "borrow"; pick = 10000; $("walletm").hidden = false; draw(); }
   $("walletbtn").addEventListener("click", open);
-  $("wtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.w; if (tab === "help") ensureTarget(); pick = tab === "borrow" ? 10000 : Math.min(1000, max()); draw(); });
+  $("wtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.w; if (tab === "help" || tab === "give") ensureTarget(); pick = tab === "borrow" ? 10000 : Math.min(1000, max()); draw(); });
   $("wbody").addEventListener("click", async (e) => {
     const pk = e.target.closest(".pack"); if (pk) { pick = +pk.dataset.v; const i = $("wamt"); if (i) i.value = ""; draw(); return; }
     const r = e.target.closest(".wrow"); if (r) { target = r.dataset.t; pick = Math.min(pick || 1000, max()); draw(); return; }
@@ -70,7 +87,8 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     try {
       if (tab === "borrow") { await call("deposit", { amount }); flash(`${fmt(amount)} 借りました`); }
       else if (tab === "repay") { await call("repay", { amount }); flash(`借金を ${fmt(amount)} 返しました`); }
-      else { const n = getPlayers()[target]?.name || ""; await call("repay", { amount, to: target }); flash(`${n} の借金を ${fmt(amount)} 肩代わりしました`); }
+      else if (tab === "help") { const n = getPlayers()[target]?.name || ""; await call("repay", { amount, to: target }); flash(`${n} の借金を ${fmt(amount)} 肩代わりしました`); }
+      else { const n = getPlayers()[target]?.name || ""; await call("give", { amount, to: target }); flash(`${n} に ${fmt(amount)} あげました`); }
       $("walletm").hidden = true;
     } catch (er) { flash(errMsg(er)); }
     busy = false; draw();
@@ -82,20 +100,21 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     document.querySelectorAll("#wbody .pack").forEach((b) => b.classList.toggle("on", +b.dataset.v === pick));
     const g = $("wgo"); if (g) { const m = max(), p = Math.min(pick, m), ok = p > 0;
       g.disabled = busy || !ok;
-      g.textContent = !ok ? "金額を入れてね" : tab === "borrow" ? `${fmt(p)} を借りる` : tab === "repay" ? `${fmt(p)} を返す` : `${getPlayers()[target]?.name || ""} の借金を ${fmt(p)} 肩代わり`; }
+      g.textContent = !ok ? "金額を入れてね" : btnText(p).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"); }
   });
 
-  // Tell me when a friend covers my debt.
+  // Tell me when a friend covers my debt or gives me chips.
   let seen = null;
   function watch() {
     const p = me(); if (!p) return;
-    const hs = p.helps || [];
-    if (seen === null) { seen = new Set(hs.map((h) => h.at + h.from)); return; }
-    for (const h of hs) {
-      const k = h.at + h.from;
+    const evs = [...(p.helps || []).map((h) => ["h", h]), ...(p.gifts || []).map((g) => ["g", g])];
+    if (seen === null) { seen = new Set(evs.map(([t, e]) => t + e.at + e.from)); return; }
+    for (const [t, e] of evs) {
+      const k = t + e.at + e.from;
       if (seen.has(k)) continue;
       seen.add(k);
-      flash(`${getPlayers()[h.from]?.name || "だれか"} が借金を ${fmt(h.amount)} 肩代わりしてくれた！`);
+      const who = getPlayers()[e.from]?.name || "だれか";
+      flash(t === "h" ? `${who} が借金を ${fmt(e.amount)} 肩代わりしてくれた！` : `${who} から ${fmt(e.amount)} チップもらった！`);
     }
   }
   return { draw, watch };
