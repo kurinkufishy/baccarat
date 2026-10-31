@@ -14,6 +14,7 @@ export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [
 export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false } });
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
 const isInt = (v) => Number.isSafeInteger(v);
+const add = (p, n) => { p.chips = Math.min(p.chips + n, G.MAX_CHIPS); };
 
 export class Core {
   /** @param {object} data persisted state  @param {{allowedEmails?: string[]}} opts */
@@ -59,7 +60,7 @@ export class Core {
   deposit(uid, amount) {
     const p = this.player(uid);
     if (!isInt(amount) || amount < 1 || amount > G.MAX_DEPOSIT) fail(`借りられるのは1回 1〜${G.MAX_DEPOSIT.toLocaleString("ja-JP")} まで`);
-    p.chips += amount; p.dep = (p.dep || 0) + amount;
+    add(p, amount); p.dep = (p.dep || 0) + amount;
     this.mark("p:" + uid);
   }
   repay(uid, amount, to, now) {
@@ -85,7 +86,7 @@ export class Core {
     const p = this.player(uid), q = this.d.players[to];
     if (!q) fail("相手が見つからないよ");
     if (amount > p.chips) fail("チップが足りない（ベット中の分は使えないよ）");
-    p.chips -= amount; q.chips += amount;
+    p.chips -= amount; add(q, amount);
     q.gifts = [{ from: uid, amount, at: now }, ...(q.gifts || [])].slice(0, 5);
     this.mark("p:" + uid, "p:" + to);
   }
@@ -133,7 +134,7 @@ export class Core {
         const st = p.st || freshStats();
         st.n++; st.wag += stake; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
         Object.assign(p, {
-          chips: p.chips + ret, lastRound: t.round, lastDelta: d, lastRet: ret, lastBets: b, st,
+          chips: Math.min(p.chips + ret, G.MAX_CHIPS), lastRound: t.round, lastDelta: d, lastRet: ret, lastBets: b, st,
           hist: [{ r: t.round, stake, d, w: r.w }, ...(p.hist || [])].slice(0, 12),
           curve: [...(p.curve || []), st.prof].slice(-300),
         });
@@ -198,7 +199,7 @@ export class Core {
       const st = p.bjst || freshStats();
       st.n++; st.wag += h.bet; st.prof += h.d; if (h.d > 0) st.w++; else if (h.d < 0) st.l++; else st.p++;
       Object.assign(p, {
-        chips: p.chips + ret, bjLast: { round: t.round, d: h.d, ret, bet: h.bet }, bjst: st,
+        chips: Math.min(p.chips + ret, G.MAX_CHIPS), bjLast: { round: t.round, d: h.d, ret, bet: h.bet }, bjst: st,
         bjhist: [{ r: t.round, bet: h.bet, d: h.d, out }, ...(p.bjhist || [])].slice(0, 12),
         bjcurve: [...(p.bjcurve || []), st.prof].slice(-300),
       });

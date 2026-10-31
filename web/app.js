@@ -7,7 +7,7 @@ import { setupWallet } from "./wallet.js";
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 1000000;
 const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 500, c: "#8e44ad", l: "500" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 5000, c: "#d63447", l: "5K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 50000, c: "#c98a12", l: "50K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }];
-const MAX_SPOT = 10000000; // per spot, same as functions/game.js
+const MAX_SPOT = 100000000000000; // per spot, same as server/src/game.js
 const SPOTS = [
   { k: "ppair", nm: "P ペア", od: "11:1", side: 1 }, { k: "player", nm: "プレイヤー", od: "1:1" }, { k: "tie", nm: "タイ", od: "8:1" },
   { k: "banker", nm: "バンカー", od: "0.95:1" }, { k: "bpair", nm: "B ペア", od: "11:1", side: 1 }];
@@ -18,7 +18,7 @@ const cv = (c) => { const i = RK.indexOf(c[0]); return i >= 9 ? 0 : i + 1; };
 const tot = (h) => h.reduce((a, c) => a + cv(c), 0) % 10;
 const sum = (b) => b ? Object.values(b).reduce((a, x) => a + (+x || 0), 0) : 0;
 const fmt = (n) => Number(n || 0).toLocaleString("ja-JP");
-const fmtK = (n) => n >= 1e6 ? (+(n / 1e6).toFixed(1)) + "M" : n >= 1000 ? (+(n / 1000).toFixed(1)) + "K" : String(n);
+const fmtK = (n) => n >= 1e12 ? (+(n / 1e12).toFixed(1)) + "T" : n >= 1e9 ? (+(n / 1e9).toFixed(1)) + "B" : n >= 1e6 ? (+(n / 1e6).toFixed(1)) + "M" : n >= 1000 ? (+(n / 1000).toFixed(1)) + "K" : String(n);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -105,7 +105,7 @@ function placeBet(k) {
   if (free <= 0) { flash("チップが足りない。残高の＋から借りられるよ"); return; }
   const b = { ...myBets() };
   const v = Math.min(amount === "all" ? free : amount, free, MAX_SPOT - b[k]);
-  if (v <= 0) { flash("1か所に置けるのは 10,000,000 まで"); return; }
+  if (v <= 0) { flash("これ以上は置けないよ"); return; }
   b[k] += v;
   placedStack.push({ k, v });
   queueBets(b);

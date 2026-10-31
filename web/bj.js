@@ -6,7 +6,7 @@ import { setupWallet } from "./wallet.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
-const MIN_BET = 100, MAX_BET = 10000000, MAX_DEPOSIT = 1000000, MAX_HANDS = 6;
+const MIN_BET = 100, MAX_BET = 100000000000000, MAX_DEPOSIT = 1000000, MAX_HANDS = 6;
 const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 500, c: "#8e44ad", l: "500" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 5000, c: "#d63447", l: "5K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 50000, c: "#c98a12", l: "50K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }];
 const RK = "A23456789TJQK", SU = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const fresh = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, history: [] });
@@ -14,7 +14,7 @@ const rv = (c) => { const i = RK.indexOf(c[0]); return i === 0 ? 1 : i >= 9 ? 10
 function total(cards) { let t = 0, a = 0; for (const c of cards) { const v = rv(c); t += v; if (v === 1) a++; } let soft = false; if (a && t + 10 <= 21) { t += 10; soft = true; } return { total: t, soft }; }
 const isBJ = (cards) => cards.length === 2 && total(cards).total === 21;
 const fmt = (n) => Number(n || 0).toLocaleString("ja-JP");
-const fmtK = (n) => n >= 1e6 ? (+(n / 1e6).toFixed(1)) + "M" : n >= 1000 ? (+(n / 1000).toFixed(1)) + "K" : String(n);
+const fmtK = (n) => n >= 1e12 ? (+(n / 1e12).toFixed(1)) + "T" : n >= 1e9 ? (+(n / 1e9).toFixed(1)) + "B" : n >= 1e6 ? (+(n / 1e6).toFixed(1)) + "M" : n >= 1000 ? (+(n / 1000).toFixed(1)) + "K" : String(n);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -75,7 +75,7 @@ function addChip(v) {
   const cur = myBet(), free = myFree();
   if (free <= 0) { flash("チップが足りない。残高の＋から借りられるよ"); return; }
   const add = Math.min(v === "all" ? free : v, free, MAX_BET - cur);
-  if (add <= 0) { flash("1回のベットは 10,000,000 まで"); return; }
+  if (add <= 0) { flash("これ以上は置けないよ"); return; }
   const next = cur + add;
   if (next < MIN_BET) { flash(`ベットは ${MIN_BET} から`); return; }
   lastBase = next; queueBet(next);

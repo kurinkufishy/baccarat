@@ -6,7 +6,7 @@ const BJ = {
   RESHUFFLE_BELOW: 78,     // cards left in the shoe (about 75% penetration of 312)
   MAX_HANDS: 6,
   MIN_BET: 100,
-  MAX_BET: 10_000_000,
+  MAX_BET: 100_000_000_000_000, // 100兆: effectively no limit
   BET_MS: 15000,
   TURN_MS: 15000,
   CARD_MS: 600,            // client animation per card dealt

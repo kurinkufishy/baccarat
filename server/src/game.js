@@ -9,7 +9,8 @@ const START = 10000;          // chips every new player starts with
 const BET_MS = 15000;         // betting window
 const HOLD_MS = 4500;         // how long the result stays on screen after the deal animation
 const IDLE_LIMIT = 3;         // rounds with no bets before the table pauses
-const MAX_SPOT = 10_000_000;  // max chips on one spot
+const MAX_SPOT = 100_000_000_000_000;  // 100兆 per spot: effectively no limit, but payouts (x12) stay exact numbers
+const MAX_CHIPS = 1_000_000_000_000_000; // 1000兆: balances never grow past exact-integer range
 const MAX_DEPOSIT = 1_000_000;
 const SPOTS = ["ppair", "player", "tie", "banker", "bpair"];
 const RK = "A23456789TJQK";
@@ -89,4 +90,4 @@ function cleanName(n) {
   return s;
 }
 
-export { START, BET_MS, HOLD_MS, IDLE_LIMIT, MAX_SPOT, MAX_DEPOSIT, SPOTS, emptyBets, sum, cv, tot, newShoe, dealCoup, payout, animMs, cleanBets, cleanName };
+export { START, BET_MS, HOLD_MS, IDLE_LIMIT, MAX_SPOT, MAX_CHIPS, MAX_DEPOSIT, SPOTS, emptyBets, sum, cv, tot, newShoe, dealCoup, payout, animMs, cleanBets, cleanName };

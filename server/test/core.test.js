@@ -232,3 +232,16 @@ test("giving chips to a friend from your own balance", () => {
   assert.deepEqual(c.d.players.b.gifts[0], { from: "a", amount: 6000, at: 7 });
   assert.equal(c.d.players.a.dep, 0, "giving is not borrowing");
 });
+
+test("no practical bet cap; balances stay exact", () => {
+  const c = new Core(freshData());
+  c.handle("a", "", "join", { name: "a" }, 0);
+  c.d.players.a.chips = 50_000_000_000;
+  c.handle("a", "", "setBets", { bets: { banker: 50_000_000_000 }, round: 1 }, 0);
+  assert.equal(c.d.players.a.chips, 0, "ALL BET of 50 billion is accepted");
+  assert.throws(() => c.handle("a", "", "setBets", { bets: { banker: G.MAX_SPOT + 1 }, round: 1 }, 0));
+  c.d.players.a.chips = G.MAX_CHIPS - 5;
+  c.handle("a", "", "deposit", { amount: 1000 }, 0);
+  assert.equal(c.d.players.a.chips, G.MAX_CHIPS);
+  assert.ok(Number.isSafeInteger(G.MAX_SPOT * 12) && Number.isSafeInteger(G.MAX_CHIPS + G.MAX_SPOT * 12));
+});
