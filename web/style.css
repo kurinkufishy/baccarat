@@ -238,7 +238,12 @@ a.ib{text-decoration:none}
 
 /* ---------- chat ---------- */
 .cbadge{background:#ff4d5e;color:#fff;border-radius:999px;font-size:10px;font-weight:800;min-width:17px;height:17px;padding:0 5px;display:inline-grid;place-items:center;margin-left:2px}
-.chatp{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(340px,calc(100vw - 32px));height:min(440px,62vh);background:var(--panel);border-radius:12px;padding:12px;z-index:45;box-shadow:0 16px 40px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.06)}
+.chatp{position:absolute;left:10px;top:58px;width:clamp(190px,22%,270px);height:min(380px,calc(100% - 70px));background:rgba(12,13,16,.86);border-radius:10px;padding:10px;z-index:8;display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(4px)}
+.chatp .mhead{font-size:14px}
+.chatp .ct{font-size:12px;padding:5px 8px}
+.cticker{position:absolute;left:10px;top:58px;z-index:8;display:flex;flex-direction:column;gap:4px;pointer-events:none;max-width:clamp(190px,26%,300px)}
+.cticker .tk{background:rgba(12,13,16,.78);border-radius:8px;padding:5px 9px;font-size:12px;line-height:1.4;overflow-wrap:anywhere;animation:tkin .25s ease-out}
+@keyframes tkin{from{opacity:0;transform:translateY(-4px)}}
 .chatp .mhead small{font-weight:500;font-size:11px;margin-left:4px}
 .clog{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;overscroll-behavior:contain}
 .cm{display:flex;gap:7px;align-items:flex-start}
@@ -253,4 +258,4 @@ a.ib{text-decoration:none}
 .cform{display:flex;gap:6px}
 .cform input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px}
 .cform .go{padding:0 14px;border-radius:8px}
-@media (max-width:640px){.chatp{left:0;right:0;bottom:0;width:auto;height:min(60vh,460px);border-radius:14px 14px 0 0;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}}
+@media (max-width:640px){.chatp{position:fixed;top:auto;left:0;right:0;bottom:0;width:auto;height:min(60vh,460px);border-radius:14px 14px 0 0;z-index:45;background:var(--panel);padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))}.chatp .ct{font-size:13px}.cticker{top:48px;max-width:70%}}
