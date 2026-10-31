@@ -6,7 +6,7 @@ import { setupWallet } from "./wallet.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
-const MIN_BET = 100, MAX_BET = 100000000000000, MAX_DEPOSIT = 1000000, MAX_HANDS = 6;
+const MIN_BET = 100, MAX_BET = 100000000000000, MAX_DEPOSIT = 10000000, MAX_HANDS = 6;
 const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 500, c: "#8e44ad", l: "500" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 5000, c: "#d63447", l: "5K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 50000, c: "#c98a12", l: "50K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }];
 const RK = "A23456789TJQK", SU = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const fresh = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, history: [] });

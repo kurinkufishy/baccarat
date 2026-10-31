@@ -1,5 +1,5 @@
 // Wallet shared by the baccarat and blackjack pages: borrow chips, pay back your debt, cover a friend's, or give chips away.
-const MAX_BORROW = 1000000;
+const MAX_BORROW = 10000000;
 
 export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, myFree }) {
   const $ = (id) => document.getElementById(id);
@@ -27,7 +27,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
   };
   const packs = (list) => `<div class="packs">${list.map(([v, l]) => `<button class="pack num ${v === pick ? "on" : ""}" data-v="${v}" ${v > 0 ? "" : "disabled"}>${l || fmt(v)}</button>`).join("")}</div>`;
   const payPacks = (m) => packs([...[1000, 10000, 50000].filter((v) => v < m).map((v) => [v]), [m, "全額 " + fmt(m)]]);
-  const amountBox = (label) => `<div><label class="flab" for="wamt">${label}</label><div class="amtrow"><input id="wamt" inputmode="numeric" class="num" placeholder="金額を入れる" autocomplete="off" value="${pick && ![1000, 10000, 50000, 100000].includes(pick) ? pick : ""}"></div></div>`;
+  const amountBox = (label) => `<div><label class="flab" for="wamt">${label}</label><div class="amtrow"><input id="wamt" inputmode="numeric" class="num" placeholder="金額を入れる" autocomplete="off" value="${pick && ![1000, 10000, 50000, 100000, 1000000, 10000000].includes(pick) ? pick : ""}"></div></div>`;
 
   function ensureTarget() {
     const ds = list();
@@ -43,7 +43,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     let h = "", btn = "", ok = false;
     const m = max(), p = Math.min(pick, m);
     if (tab === "borrow") {
-      h = packs([[1000], [10000], [50000], [100000]]) + amountBox(`好きな額を借りる（1回 ${fmt(MAX_BORROW)} まで）`)
+      h = packs([[10000], [100000], [1000000], [10000000]]) + amountBox(`好きな額を借りる（1回 ${fmt(MAX_BORROW)} まで）`)
         + `<p class="small">借りた分は「借金」になって、ランキングの収支から引かれる。返せば元に戻るよ。チップは全部架空だから、お金はかからない。</p>`;
       ok = pick > 0 && pick <= MAX_BORROW; btn = ok ? `${fmt(pick)} を借りる` : "金額を選んでね";
     } else if (tab === "repay") {

@@ -11,7 +11,7 @@ const HOLD_MS = 4500;         // how long the result stays on screen after the d
 const IDLE_LIMIT = 3;         // rounds with no bets before the table pauses
 const MAX_SPOT = 100_000_000_000_000;  // 100兆 per spot: effectively no limit, but payouts (x12) stay exact numbers
 const MAX_CHIPS = 1_000_000_000_000_000; // 1000兆: balances never grow past exact-integer range
-const MAX_DEPOSIT = 1_000_000;
+const MAX_DEPOSIT = 10_000_000;
 const SPOTS = ["ppair", "player", "tie", "banker", "bpair"];
 const RK = "A23456789TJQK";
 
