@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAut
 import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
+import { setupChat } from "./chat.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 10000000;
@@ -372,7 +373,7 @@ function renderRoads() {
 const netOf = (p) => p.chips + (p.id === me ? sum(serverMyBets()) : (betsMap[p.id] && betsMap[p.id].round === state.round ? betsMap[p.id].total : 0)) - START - (p.dep || 0);
 function renderSide(list) {
   const on = gate === "in";
-  $("sidebtn").hidden = !on; $("statsbtn").hidden = !on;
+  $("sidebtn").hidden = !on; $("statsbtn").hidden = !on; chat.live(on);
   $("side").hidden = !(on && sideOpen); $("sidebtn").classList.toggle("on", sideOpen); $("sidebtn").setAttribute("aria-pressed", sideOpen);
   $("sidebtn").textContent = `メンバー ${list.length}`;
   if (!on || !sideOpen) return;
@@ -454,6 +455,7 @@ function render() {
 
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
+const chat = setupChat({ call, errMsg, esc, getMe: () => me });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
 $("rulesbtn").addEventListener("click", () => { $("rulesm").hidden = false; });
@@ -556,12 +558,13 @@ function applyBatch(msgs) {
     else if (m.type === "bacBets") { betsMap = m.v || {}; if (ackWant && sameBets(ackWant, serverMyBets())) ackWant = null; }
     else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
     else if (m.type === "meta") importAvail = !(m.v && m.v.imported);
+    else if (m.type === "chat") chat.set(m.v);
     else if (m.type === "notice") flash(m.text);
   }
   render();
 }
 function onReady(st, uid) {
-  me = uid; players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
   firstState = true; setTable(st.bac);
   gate = players[me] ? "in" : "join";
   render();

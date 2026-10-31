@@ -245,3 +245,21 @@ test("no practical bet cap; balances stay exact", () => {
   assert.equal(c.d.players.a.chips, G.MAX_CHIPS);
   assert.ok(Number.isSafeInteger(G.MAX_SPOT * 12) && Number.isSafeInteger(G.MAX_CHIPS + G.MAX_SPOT * 12));
 });
+
+test("global chat", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  nc(() => c.handle("x", "", "chat", { text: "hi" }, 0), /参加/);
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  c.handle("a", "", "chat", { text: "  やあ\n<b>みんな</b>‮  " }, 1000);
+  assert.deepEqual(c.d.chat.map((m) => [m.id, m.uid, m.name, m.text]), [[1, "a", "あ", "やあ <b>みんな</b>"]]);
+  nc(() => c.handle("a", "", "chat", { text: "速い" }, 1200), /速すぎ/);
+  nc(() => c.handle("a", "", "chat", { text: "   " }, 5000), /入れて/);
+  nc(() => c.handle("a", "", "chat", { text: "あ".repeat(121) }, 5000), /120/);
+  nc(() => c.handle("a", "", "chat", { text: 5 }, 5000));
+  for (let i = 0; i < 60; i++) c.handle("a", "", "chat", { text: "m" + i }, 10_000 + i * 1000);
+  assert.equal(c.d.chat.length, 50);
+  assert.equal(c.d.chat.at(-1).id, 61);
+  assert.equal(c.fullState().chat.length, 50);
+  assert.ok(c.takeChanges().has("chat"));
+});

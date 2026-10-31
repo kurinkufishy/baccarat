@@ -8,7 +8,7 @@ import { readOldData } from "./firestore.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat"]);
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
 function originOk(req, env) {
@@ -47,7 +47,7 @@ export class Casino extends DurableObject {
       else d[k] = v;
     }
     const core = new Core(null, { allowedEmails: csv(this.env.ALLOWED_EMAILS) });
-    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta"]) if (d[k] !== undefined) core.d[k] = d[k];
+    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat"]) if (d[k] !== undefined) core.d[k] = d[k];
     core.d.players = d.players;
     this.core = core;
   }

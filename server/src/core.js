@@ -11,7 +11,8 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false } });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [] });
+const CHAT_KEEP = 50, CHAT_MAX = 120, CHAT_GAP_MS = 400;
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
 const isInt = (v) => Number.isSafeInteger(v);
 const add = (p, n) => { p.chips = Math.min(p.chips + n, G.MAX_CHIPS); };
@@ -22,6 +23,7 @@ export class Core {
     this.d = data || freshData();
     this.allowed = (opts.allowedEmails || []).map((e) => e.toLowerCase());
     this.changed = new Set();
+    this.lastChat = new Map(); // uid -> time of last message; memory only
   }
   mark(...keys) { keys.forEach((k) => this.changed.add(k)); }
   player(uid) { const p = this.d.players[uid]; if (!p) fail("先に参加してね"); return p; }
@@ -38,6 +40,7 @@ export class Core {
       case "give": return this.give(uid, m.amount, m.to, now);
       case "bjBet": return this.bjBet(uid, m.amount, m.round, now);
       case "bjAct": return this.bjAct(uid, m.action, m.round, m.turn, now);
+      case "chat": return this.chat(uid, m.text, now);
       default: fail("その操作はできないよ");
     }
   }
@@ -89,6 +92,22 @@ export class Core {
     p.chips -= amount; add(q, amount);
     q.gifts = [{ from: uid, amount, at: now }, ...(q.gifts || [])].slice(0, 5);
     this.mark("p:" + uid, "p:" + to);
+  }
+
+  /* ---------------- chat (one room for everyone) ---------------- */
+  chat(uid, raw, now) {
+    const p = this.player(uid);
+    if (typeof raw !== "string") fail("メッセージがおかしいよ");
+    const text = raw.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) fail("メッセージを入れてね");
+    if ([...text].length > CHAT_MAX) fail(`メッセージは${CHAT_MAX}文字まで`);
+    if (now - (this.lastChat.get(uid) || 0) < CHAT_GAP_MS) fail("ちょっと速すぎるよ");
+    this.lastChat.set(uid, now);
+    if (!Array.isArray(this.d.chat)) this.d.chat = [];
+    const last = this.d.chat[this.d.chat.length - 1];
+    this.d.chat.push({ id: (last ? last.id : 0) + 1, uid, name: p.name, color: p.color, text, at: now });
+    if (this.d.chat.length > CHAT_KEEP) this.d.chat = this.d.chat.slice(-CHAT_KEEP);
+    this.mark("chat");
   }
 
   /* ---------------- baccarat ---------------- */
@@ -342,10 +361,11 @@ export class Core {
     if (key === "bj") return d.bj; // the hole card lives in bjShoe, never here
     if (key === "bjBets") return d.bjBets;
     if (key === "meta") return { imported: !!d.meta.imported };
+    if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta") };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat") };
   }
 }
