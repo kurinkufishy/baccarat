@@ -263,3 +263,18 @@ test("global chat", () => {
   assert.equal(c.fullState().chat.length, 50);
   assert.ok(c.takeChanges().has("chat"));
 });
+
+test("owner grants run once, as debt, by exact nickname", () => {
+  const c = new Core(freshData());
+  c.handle("u1", "", "join", { name: "taktak7633" }, 0);
+  c.handle("u2", "", "join", { name: "other" }, 0);
+  const g = [{ id: "g1", name: "taktak7633", amount: 10_000_000_000, asDebt: true }, { id: "g2", name: "nobody", amount: 5, asDebt: true }];
+  const r = c.applyGrants(g, 123);
+  assert.equal(r.g1, "ok:123"); assert.equal(r.g2, "not-found");
+  assert.equal(c.d.players.u1.chips, 10_000_010_000); assert.equal(c.d.players.u1.dep, 10_000_000_000);
+  c.applyGrants(g, 456);
+  assert.equal(c.d.players.u1.chips, 10_000_010_000, "second run does nothing");
+  c.handle("u3", "", "join", { name: "taktak7633" }, 0);
+  c.applyGrants([{ id: "g3", name: "taktak7633", amount: 1, asDebt: false }], 789);
+  assert.equal(c.d.meta.grants.g3, "ambiguous");
+});

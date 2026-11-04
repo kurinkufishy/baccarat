@@ -353,6 +353,26 @@ export class Core {
     return Object.keys(players).length;
   }
 
+  /* ---------------- owner grants (see grants.js) ---------------- */
+  applyGrants(list, now) {
+    const meta = this.d.meta, done = (meta.grants = meta.grants || {});
+    let changed = false;
+    for (const g of list) {
+      if (done[g.id] && done[g.id].startsWith("ok")) continue;
+      if (!isInt(g.amount) || g.amount < 1) { done[g.id] = "bad-amount"; changed = true; continue; }
+      const hits = Object.entries(this.d.players).filter(([, p]) => p.name === g.name);
+      if (hits.length !== 1) { const why = hits.length ? "ambiguous" : "not-found"; if (done[g.id] !== why) { done[g.id] = why; changed = true; } continue; }
+      const [uid, p] = hits[0];
+      add(p, g.amount);
+      if (g.asDebt) p.dep = (p.dep || 0) + g.amount;
+      done[g.id] = "ok:" + now;
+      this.mark("p:" + uid);
+      changed = true;
+    }
+    if (changed) this.mark("meta");
+    return done;
+  }
+
   /* ---------------- views sent to clients ---------------- */
   view(key) {
     const d = this.d;

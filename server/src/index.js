@@ -5,6 +5,7 @@ import { DurableObject } from "cloudflare:workers";
 import { Core, GameError } from "./core.js";
 import { verifyIdToken } from "./auth.js";
 import { readOldData } from "./firestore.js";
+import { GRANTS } from "./grants.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
@@ -22,6 +23,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === "/health") return new Response("ok");
+    if (url.pathname === "/grants") return env.CASINO.get(env.CASINO.idFromName("main")).fetch(req);
     if (url.pathname !== "/ws") return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     if (!originOk(req, env)) return new Response("forbidden origin", { status: 403 });
@@ -50,6 +52,8 @@ export class Casino extends DurableObject {
     for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat"]) if (d[k] !== undefined) core.d[k] = d[k];
     core.d.players = d.players;
     this.core = core;
+    core.applyGrants(GRANTS, Date.now());
+    if (core.changed.size) await this.commit();
   }
 
   /** Save whatever changed, push it to everyone, and set the next alarm. */
@@ -88,6 +92,7 @@ export class Casino extends DurableObject {
 
   async fetch(req) {
     await this.ready;
+    if (new URL(req.url).pathname === "/grants") return Response.json(this.core.d.meta.grants || {});
     const socks = this.ctx.getWebSockets();
     if (socks.length >= MAX_SOCKETS) return new Response("table is full", { status: 503 });
     const pair = new WebSocketPair();
