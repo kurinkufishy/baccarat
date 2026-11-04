@@ -1,8 +1,10 @@
 // Achievements window and unlock toasts, shared by both pages. The server decides what's unlocked;
 // this only draws it. Toasts wait while cards are still being dealt so they never spoil a result.
-export function setupAch({ esc, fmt, getMe, getPlayers, busy }) {
+import { avatar } from "./avatar.js";
+
+export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, busy }) {
   const $ = (id) => document.getElementById(id);
-  let defs = [], known = null, tab = "me", queue = [], showing = false;
+  let defs = [], frames = [], known = null, knownFr = null, tab = "me", queue = [], showing = false, busyFr = false;
   const TIER = { 1: "ブロンズ", 2: "シルバー", 3: "ゴールド" };
 
   const btn = document.createElement("button");
@@ -14,7 +16,7 @@ export function setupAch({ esc, fmt, getMe, getPlayers, busy }) {
   ov.className = "overlay"; ov.id = "achm"; ov.hidden = true;
   ov.innerHTML = `<div class="modal achmodal" role="dialog" aria-modal="true" aria-labelledby="acht">
     <div class="mhead"><span id="acht">実績</span><button class="x" data-close aria-label="閉じる">×</button></div>
-    <div class="tabs" id="achtabs"><button data-t="me" class="on">自分</button><button data-t="all">みんな</button></div>
+    <div class="tabs" id="achtabs"><button data-t="me" class="on">自分</button><button data-t="frame">フレーム</button><button data-t="all">みんな</button></div>
     <div id="achbody"></div></div>`;
   document.body.appendChild(ov);
   const toast = document.createElement("div");
@@ -35,12 +37,19 @@ export function setupAch({ esc, fmt, getMe, getPlayers, busy }) {
           const on = !!got[a.id], hide = a.secret && !on;
           return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span><small>${TIER[a.tier]}${on ? "・" + date(got[a.id]) : ""}</small></div></div>`;
         }).join("")}</div>`;
+    } else if (tab === "frame") {
+      const p = getPlayers()[getMe()] || {}, cur = p.frame || "";
+      h = `<p class="small" style="margin:0">実績を集めるとフレームが使えるようになるよ。つけたフレームはチャットやランキングでみんなに見える。</p>
+        <div class="frgrid">${[{ id: "", name: "なし", how: "" }, ...frames].map((f) => {
+          const ok = f.id === "" || frameOk(p, f), on = f.id === cur;
+          return `<button class="frc ${on ? "on" : ""}" data-f="${esc(f.id)}" ${!ok || on || busyFr ? "disabled" : ""}>${avatar(p, esc, f.id, "big")}<b>${esc(f.name)}</b><small>${on ? "つけてる" : ok ? "つける" : "🔒 " + esc(f.how)}</small></button>`;
+        }).join("")}</div>`;
     } else {
       const ps = Object.entries(getPlayers()).map(([id, p]) => {
         const got = p.ach || {}, list = defs.filter((a) => got[a.id]);
         return { id, p, n: list.length, gold: list.filter((a) => a.tier === 3).length, last: list.sort((x, y) => got[y.id] - got[x.id])[0] };
       }).sort((a, b) => b.n - a.n || b.gold - a.gold);
-      h = `<div class="achrank">${ps.map((r, i) => `<div class="achr ${r.id === getMe() ? "me" : ""}"><span class="num rk">${i + 1}</span><span class="dot" style="background:${esc(r.p.color)}">${esc((r.p.name || "?")[0])}</span><span class="n">${esc(r.p.name)}<small>${r.last ? "最近: " + esc(r.last.name) : "まだなし"}</small></span><span class="num c">${r.n}<small>${r.gold ? ` ★${r.gold}` : ""}</small></span></div>`).join("") || `<div class="empty">まだ誰もいないよ</div>`}</div>`;
+      h = `<div class="achrank">${ps.map((r, i) => `<div class="achr ${r.id === getMe() ? "me" : ""}"><span class="num rk">${i + 1}</span>${avatar(r.p, esc)}<span class="n">${esc(r.p.name)}<small>${r.last ? "最近: " + esc(r.last.name) : "まだなし"}</small></span><span class="num c">${r.n}<small>${r.gold ? ` ★${r.gold}` : ""}</small></span></div>`).join("") || `<div class="empty">まだ誰もいないよ</div>`}</div>`;
     }
     $("achbody").innerHTML = h;
   }
@@ -51,23 +60,41 @@ export function setupAch({ esc, fmt, getMe, getPlayers, busy }) {
     const a = queue.shift();
     showing = true;
     toast.className = `achtoast t${a.tier}`;
-    toast.innerHTML = `<span class="medal" aria-hidden="true">★</span><div><small>実績解除・${TIER[a.tier]}</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div>`;
+    toast.innerHTML = `<span class="medal" aria-hidden="true">★</span><div><small>${a.frame ? "新しいフレーム" : "実績解除・" + TIER[a.tier]}</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div>`;
     toast.hidden = false;
     setTimeout(() => { toast.hidden = true; showing = false; setTimeout(pump, 300); }, 3800);
   }
 
+  const tierOf = (id) => (defs.find((a) => a.id === id) || {}).tier;
+  function frameOk(p, f) {
+    const got = Object.keys(p.ach || {}).filter((id) => tierOf(id));
+    if (f.req.count) return got.length >= f.req.count;
+    if (f.req.gold) return got.filter((id) => tierOf(id) === 3).length >= f.req.gold;
+    if (f.req.ach) return got.includes(f.req.ach);
+    return false;
+  }
+  $("achbody").addEventListener("click", async (e) => {
+    const b = e.target.closest(".frc"); if (!b || b.disabled || busyFr) return;
+    busyFr = true; draw();
+    try { await call("setFrame", { frame: b.dataset.f }); flash(b.dataset.f ? `フレーム「${frames.find((f) => f.id === b.dataset.f)?.name}」をつけた` : "フレームを外した"); }
+    catch (er) { flash(errMsg(er)); }
+    busyFr = false; draw();
+  });
   btn.addEventListener("click", () => { ov.hidden = false; tab = "me"; draw(); });
   ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("[data-close]")) ov.hidden = true; });
   $("achtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.t; draw(); } });
 
   return {
-    setDefs(list) { if (Array.isArray(list) && list.length) defs = list; },
-    reset() { known = null; },
+    setDefs(list, fr) { if (Array.isArray(list) && list.length) defs = list; if (Array.isArray(fr)) frames = fr; },
+    reset() { known = null; knownFr = null; },
     /** Call after every state update. */
     update(live) {
       btn.hidden = !live || !defs.length;
       const p = getPlayers()[getMe()];
       if (!live || !p) return;
+      // My own frame on the account button too.
+      const img = document.querySelector("#acctbtn img");
+      if (img) img.className = p.frame ? `fr fr-${p.frame}` : "";
       const got = p.ach || {};
       if (known === null) known = new Set(Object.keys(got));
       for (const id of Object.keys(got)) {
@@ -76,6 +103,10 @@ export function setupAch({ esc, fmt, getMe, getPlayers, busy }) {
         const a = defs.find((x) => x.id === id);
         if (a) queue.push(a);
       }
+      // Tell me when a new frame becomes available.
+      const usable = frames.filter((f) => frameOk(p, f)).map((f) => f.id);
+      if (knownFr === null) knownFr = new Set(usable);
+      for (const id of usable) if (!knownFr.has(id)) { knownFr.add(id); const f = frames.find((x) => x.id === id); queue.push({ tier: 3, name: `フレーム「${f.name}」`, desc: "実績の画面の「フレーム」からつけられるよ", frame: true }); }
       pump();
       draw();
     },

@@ -71,3 +71,24 @@ export function streak(p, key, d) {
   else if (d < 0) p.ax[key] = s < 0 ? s - 1 : -1;
   return p.ax[key];
 }
+
+// Avatar frames. Unlocked by achievements; the same req data is sent to clients so they can show what's left.
+// req: {count: n} n achievements, {gold: n} n gold-tier achievements, {ach: id} that one achievement.
+export const FRAMES = [
+  { id: "bronze", name: "ブロンズ", req: { count: 3 }, how: "実績を3個解除" },
+  { id: "silver", name: "シルバー", req: { count: 8 }, how: "実績を8個解除" },
+  { id: "sakura", name: "さくら", req: { ach: "give" }, how: "実績「太っ腹」を解除" },
+  { id: "gold", name: "ゴールド", req: { gold: 1 }, how: "ゴールド実績を1個解除" },
+  { id: "fire", name: "炎", req: { ach: "lose100m" }, how: "実績「大爆死」を解除" },
+  { id: "neon", name: "ネオン", req: { count: 12 }, how: "実績を12個解除" },
+  { id: "rainbow", name: "虹色", req: { count: 15 }, how: "実績を15個解除" },
+  { id: "diamond", name: "ダイヤ", req: { ach: "rich1t" }, how: "実績「1兆長者」を解除" },
+];
+const TIER_OF = Object.fromEntries(ACH.map((a) => [a.id, a.tier]));
+export function frameOk(p, f) {
+  const got = Object.keys(p.ach || {}).filter((id) => TIER_OF[id]);
+  if (f.req.count) return got.length >= f.req.count;
+  if (f.req.gold) return got.filter((id) => TIER_OF[id] === 3).length >= f.req.gold;
+  if (f.req.ach) return got.includes(f.req.ach);
+  return false;
+}

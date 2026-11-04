@@ -1,6 +1,8 @@
 // One chat room for everyone, shared by the baccarat and blackjack pages.
 // Builds its own button and panel; the page feeds it messages and tells it when the player is signed in.
-export function setupChat({ call, errMsg, esc, getMe }) {
+import { avatar } from "./avatar.js";
+
+export function setupChat({ call, errMsg, esc, getMe, getPlayers }) {
   const $ = (id) => document.getElementById(id);
   const MAX = 120;
   const wide = () => window.matchMedia("(min-width: 641px)").matches;
@@ -33,7 +35,7 @@ export function setupChat({ call, errMsg, esc, getMe }) {
 
   function drawLog() {
     const log = $("clog"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    log.innerHTML = msgs.length ? msgs.map((m) => `<div class="cm ${m.uid === getMe() ? "me" : ""}"><span class="dot" style="background:${esc(m.color)}">${esc((m.name || "?")[0])}</span><div class="cb"><div class="cn"><b>${esc(m.name)}</b><time>${time(m.at)}</time></div><div class="ct">${esc(m.text)}</div></div></div>`).join("")
+    log.innerHTML = msgs.length ? msgs.map((m) => `<div class="cm ${m.uid === getMe() ? "me" : ""}">${avatar(m, esc, getPlayers()[m.uid]?.frame)}<div class="cb"><div class="cn"><b>${esc(m.name)}</b><time>${time(m.at)}</time></div><div class="ct">${esc(m.text)}</div></div></div>`).join("")
       : `<div class="empty">まだ誰もしゃべってないよ</div>`;
     if (atBottom || log.dataset.first !== "1") { log.scrollTop = log.scrollHeight; log.dataset.first = "1"; }
   }

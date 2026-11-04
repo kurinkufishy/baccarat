@@ -1,4 +1,6 @@
 // Wallet shared by the baccarat and blackjack pages: borrow chips, pay back your debt, cover a friend's, or give chips away.
+import { avatar } from "./avatar.js";
+
 const MAX_BORROW = 10000000;
 
 export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, myFree }) {
@@ -17,7 +19,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     if (!p) return 0;
     return tab === "give" ? myFree() : Math.min(myFree(), p.dep || 0);
   }
-  const rows = (ds, label, right, cls = "") => `<div class="wlist" role="radiogroup" aria-label="${label}">${ds.map(([id, q]) => `<button class="wrow ${id === target ? "on" : ""}" data-t="${esc(id)}" role="radio" aria-checked="${id === target}"><span class="dot" style="background:${esc(q.color)}">${esc((q.name || "?")[0])}</span><span class="n">${esc(q.name)}</span><span class="v num ${cls}">${right(q)}</span></button>`).join("")}</div>`;
+  const rows = (ds, label, right, cls = "") => `<div class="wlist" role="radiogroup" aria-label="${label}">${ds.map(([id, q]) => `<button class="wrow ${id === target ? "on" : ""}" data-t="${esc(id)}" role="radio" aria-checked="${id === target}">${avatar(q, esc)}<span class="n">${esc(q.name)}</span><span class="v num ${cls}">${right(q)}</span></button>`).join("")}</div>`;
   const btnText = (p) => {
     const tn = esc(getPlayers()[target]?.name || "");
     if (tab === "borrow") return `${fmt(p)} を借りる`;

@@ -78,7 +78,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--go);outline-off
 .row .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .row .v{font-weight:700;text-align:right}
 .pos{color:var(--go)}.neg{color:#ff7a84}.mut{color:var(--muted)}
-.dot{width:18px;height:18px;border-radius:50%;font-size:10px;display:grid;place-items:center;color:#0b1218;font-weight:800;flex:none}
+.dot{width:18px;height:18px;border-radius:50%;font-size:10px;display:grid;place-items:center;color:#0b1218;font-weight:800;flex:none;background:var(--c,#888)}
 .you{font-size:9px;background:var(--gold);color:#241a05;border-radius:3px;padding:1px 4px;margin-left:4px;vertical-align:1px}
 .sidefoot{padding:6px;border-top:1px solid var(--line)}
 .empty{color:var(--muted);text-align:center;padding:14px 8px;font-size:12px;line-height:1.6}
@@ -294,3 +294,31 @@ a.ib{text-decoration:none}
 .achtoast b{font-size:16px}.achtoast span{font-size:11px;color:var(--muted)}
 @keyframes achin{from{opacity:0;transform:translate(-50%,-12px) scale(.96)}}
 @media (prefers-reduced-motion:reduce){.achtoast{animation:none}}
+
+/* ---------- avatar frames ---------- */
+@property --frp{syntax:"<percentage>";inherits:false;initial-value:0%}
+@keyframes frmove{to{--frp:100%}}
+.dot.fr{box-sizing:content-box;padding:2px;background:linear-gradient(var(--c),var(--c)) content-box,var(--ring) border-box;background-size:auto,var(--rs,100% 100%);background-position:0 0,var(--frp) 50%}
+.acct img.fr{box-sizing:border-box;padding:2px;background:var(--ring);background-size:var(--rs,100% 100%);background-position:var(--frp) 50%}
+.fr-bronze{--ring:linear-gradient(135deg,#f6c7a2,#8a4b26 50%,#e9a77b)}
+.fr-silver{--ring:linear-gradient(135deg,#fff,#8f99a3 50%,#eef2f5)}
+.fr-sakura{--ring:linear-gradient(135deg,#ffe0ef,#ff7eb6 50%,#ffd0e6);box-shadow:0 0 5px rgba(255,126,182,.6)}
+.fr-gold{--ring:linear-gradient(120deg,#b8860b,#ffe58a 25%,#d4a017 45%,#fff6c4 60%,#b8860b);--rs:250% 250%;box-shadow:0 0 6px rgba(255,200,60,.7);animation:frmove 1.6s ease-in-out infinite alternate}
+.fr-fire{--ring:linear-gradient(0deg,#ff2d00,#ffb000,#ffe96b,#ff6a00,#ff2d00,#ffb000,#ffe96b,#ff6a00,#ff2d00);--rs:100% 200%;animation:frmove .9s linear infinite,frfire .5s ease-in-out infinite alternate}
+.dot.fr-fire{background-position:0 0,50% var(--frp)}.acct img.fr-fire{background-position:50% var(--frp)}
+@keyframes frfire{from{box-shadow:0 -1px 5px rgba(255,90,0,.6)}to{box-shadow:0 -3px 10px rgba(255,150,0,.85)}}
+.fr-neon{--ring:linear-gradient(#5ffcff,#5ffcff);animation:frneon 1.3s ease-in-out infinite alternate}
+@keyframes frneon{from{box-shadow:0 0 3px #39f9ff}to{box-shadow:0 0 6px #39f9ff,0 0 14px #1ad1ff}}
+.fr-rainbow{--ring:linear-gradient(90deg,#ff3b3b,#ff9f1a,#ffe11a,#3bd65b,#1ad1ff,#4b6bff,#b14bff,#ff3b3b,#ff9f1a,#ffe11a,#3bd65b,#1ad1ff,#4b6bff,#b14bff,#ff3b3b);--rs:200% 100%;box-shadow:0 0 7px rgba(255,255,255,.35);animation:frmove 2.2s linear infinite}
+.fr-diamond{--ring:linear-gradient(135deg,#fff,#9fe6ff 25%,#fff 50%,#7fd0ff 75%,#fff);--rs:250% 250%;animation:frmove 1.4s ease-in-out infinite alternate,frspark 1.1s ease-in-out infinite alternate}
+@keyframes frspark{from{box-shadow:0 0 4px rgba(190,240,255,.6)}to{box-shadow:0 0 9px #fff,0 0 16px rgba(127,208,255,.8)}}
+.dot.big{width:40px;height:40px;font-size:18px}.dot.big.fr{padding:3px}
+.frgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.frc{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--panel2);border:1px solid transparent;border-radius:10px;padding:12px 6px 10px;color:var(--text);cursor:pointer;font:inherit}
+.frc:hover:not(:disabled){border-color:var(--gold)}
+.frc.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,var(--panel2))}
+.frc:disabled{cursor:default}.frc:disabled:not(.on){opacity:.55}
+.frc b{font-size:13px}.frc small{font-size:10px;color:var(--muted);text-align:center;line-height:1.35}
+.frc.on small{color:var(--gold);font-weight:700}
+@media (prefers-reduced-motion:reduce){.fr{animation:none!important}}
+.dot.fr:not(.big){margin:-2px}

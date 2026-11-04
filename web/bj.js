@@ -6,6 +6,7 @@ import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
+import { avatar } from "./avatar.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
@@ -401,7 +402,7 @@ function renderLists() {
   $("mlist").innerHTML = rows.length ? rows.map(({ uid, p, prof, n }, i) => {
     const hidden = settledHidden(p) && p.bjLast;
     const pr = hidden ? prof - p.bjLast.d : prof;
-    return `<div class="row"><span class="dot" style="background:${esc(p.color)}">${esc((p.name || "?")[0])}</span><span class="n">${i + 1}. ${esc(p.name)}${uid === me ? '<span class="you">あなた</span>' : ""}</span><span class="v num ${pr > 0 ? "pos" : pr < 0 ? "neg" : "mut"}">${pr >= 0 ? "+" : ""}${fmt(pr)}（${n}回）</span></div>`;
+    return `<div class="row">${avatar(p, esc)}<span class="n">${i + 1}. ${esc(p.name)}${uid === me ? '<span class="you">あなた</span>' : ""}</span><span class="v num ${pr > 0 ? "pos" : pr < 0 ? "neg" : "mut"}">${pr >= 0 ? "+" : ""}${fmt(pr)}（${n}回）</span></div>`;
   }).join("") : '<div class="empty">まだ誰も遊んでいません</div>';
 }
 function renderGate() {
@@ -443,8 +444,8 @@ function render() {
 
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
-const chat = setupChat({ call, errMsg, esc, getMe: () => me });
-const ach = setupAch({ esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => animating > 0 || (t.phase === "result" && sNow() < (t.animUntil || 0)) });
+const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
+const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => animating > 0 || (t.phase === "result" && sNow() < (t.animUntil || 0)) });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
@@ -548,7 +549,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs); ach.reset(); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs); ach.reset(); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
   Object.keys(els).forEach((k) => { els[k].remove(); delete els[k]; });
   firstState = true; setTable(st.bj);
   gate = players[me] ? "in" : "join";

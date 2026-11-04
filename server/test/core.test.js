@@ -320,3 +320,18 @@ test("achievements unlock on the server", async () => {
   assert.ok(c.fullState().achDefs.length >= 20);
   const p = {}; for (let i = 0; i < 5; i++) A.streak(p, "b", 10); assert.equal(p.ax.b, 5); A.streak(p, "b", 0); assert.equal(p.ax.b, 5); A.streak(p, "b", -1); assert.equal(p.ax.b, -1);
 });
+
+test("frames need their achievements", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  nc(() => c.handle("a", "", "setFrame", { frame: "rainbow" }, 0), /まだ/);
+  nc(() => c.handle("a", "", "setFrame", { frame: "nope" }, 0), /ない/);
+  nc(() => c.handle("a", "", "setFrame", { frame: { x: 1 } }, 0), /ない/);
+  c.d.players.a.ach = { win10b: 1, chat: 1, give: 1 };
+  c.handle("a", "", "setFrame", { frame: "gold" }, 0); assert.equal(c.d.players.a.frame, "gold");
+  c.handle("a", "", "setFrame", { frame: "bronze" }, 0); assert.equal(c.d.players.a.frame, "bronze");
+  nc(() => c.handle("a", "", "setFrame", { frame: "silver" }, 0), /8個/);
+  c.handle("a", "", "setFrame", { frame: "" }, 0); assert.equal(c.d.players.a.frame, undefined);
+  assert.ok(c.fullState().frameDefs.some((f) => f.id === "rainbow"));
+});
