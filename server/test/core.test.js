@@ -274,7 +274,27 @@ test("owner grants run once, as debt, by exact nickname", () => {
   assert.equal(c.d.players.u1.chips, 10_000_010_000); assert.equal(c.d.players.u1.dep, 10_000_000_000);
   c.applyGrants(g, 456);
   assert.equal(c.d.players.u1.chips, 10_000_010_000, "second run does nothing");
-  c.handle("u3", "", "join", { name: "taktak7633" }, 0);
+  c.handle("u3", "", "join", { name: "x" }, 0); c.d.players.u3.name = "taktak7633"; // old duplicates can still exist
   c.applyGrants([{ id: "g3", name: "taktak7633", amount: 1, asDebt: false }], 789);
   assert.equal(c.d.meta.grants.g3, "ambiguous");
+});
+
+test("rename costs 1M, names stay unique, re-seating keeps the name", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あき" }, 0);
+  c.handle("b", "", "join", { name: "ぼぶ" }, 0);
+  nc(() => c.handle("c", "", "join", { name: "ぼぶ" }, 0), /使われてる/);
+  nc(() => c.handle("a", "", "rename", { name: "新" }, 0), /足りない/);
+  c.d.players.a.chips = 1_500_000;
+  nc(() => c.handle("a", "", "rename", { name: "ぼぶ" }, 0), /使われてる/);
+  nc(() => c.handle("a", "", "rename", { name: "あき" }, 0), /同じ/);
+  nc(() => c.handle("a", "", "rename", { name: "" }, 0), /1〜12/);
+  assert.equal(c.d.players.a.chips, 1_500_000, "refusals cost nothing");
+  c.handle("a", "", "rename", { name: "あきら" }, 0);
+  assert.equal(c.d.players.a.name, "あきら"); assert.equal(c.d.players.a.chips, 500_000);
+  c.handle("a", "", "leave", {}, 0);
+  c.handle("a", "", "join", { name: "タダで変える" }, 0);
+  assert.equal(c.d.players.a.name, "あきら", "join never renames an existing player");
+  assert.equal(c.d.players.a.seated, true);
 });

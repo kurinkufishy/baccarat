@@ -12,6 +12,7 @@ const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870"
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
 export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [] });
+const RENAME_COST = 1_000_000;
 const CHAT_KEEP = 50, CHAT_MAX = 120, CHAT_GAP_MS = 400;
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
 const isInt = (v) => Number.isSafeInteger(v);
@@ -41,18 +42,22 @@ export class Core {
       case "bjBet": return this.bjBet(uid, m.amount, m.round, now);
       case "bjAct": return this.bjAct(uid, m.action, m.round, m.turn, now);
       case "chat": return this.chat(uid, m.text, now);
+      case "rename": return this.rename(uid, m.name);
       default: fail("その操作はできないよ");
     }
   }
 
   /* ---------------- players & wallet ---------------- */
+  nameTaken(name, uid) { return Object.entries(this.d.players).some(([id, q]) => id !== uid && q.name === name); }
   join(uid, email, rawName, now) {
-    let name;
-    try { name = G.cleanName(rawName); } catch { fail("名前は1〜12文字で入れてね"); }
     if (this.allowed.length && !this.allowed.includes(String(email || "").toLowerCase())) fail("このテーブルには招待されたアカウントだけ参加できます");
     const p = this.d.players[uid];
-    if (p) { p.name = name; p.seated = true; }
+    // Coming back keeps your name; changing it costs chips (rename).
+    if (p) p.seated = true;
     else {
+      let name;
+      try { name = G.cleanName(rawName); } catch { fail("名前は1〜12文字で入れてね"); }
+      if (this.nameTaken(name, uid)) fail("その名前はもう使われてるよ");
       this.d.players[uid] = {
         name, color: COLORS[Object.keys(this.d.players).length % COLORS.length], chips: G.START, dep: 0, seated: true, joinedAt: now,
         lastRound: 0, lastDelta: 0, lastRet: 0, lastBets: null, hist: [], st: freshStats(), curve: [],
@@ -79,6 +84,18 @@ export class Core {
     p.chips -= amount; q.dep = debt - amount;
     if (to !== uid) q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5);
     this.mark("p:" + uid, "p:" + to);
+  }
+
+  /** Change my nickname for RENAME_COST chips. */
+  rename(uid, rawName) {
+    const p = this.player(uid);
+    let name;
+    try { name = G.cleanName(rawName); } catch { fail("名前は1〜12文字で入れてね"); }
+    if (name === p.name) fail("今と同じ名前だよ");
+    if (this.nameTaken(name, uid)) fail("その名前はもう使われてるよ");
+    if (p.chips < RENAME_COST) fail(`チップが足りない（名前の変更は ${RENAME_COST.toLocaleString("ja-JP")}）`);
+    p.chips -= RENAME_COST; p.name = name;
+    this.mark("p:" + uid);
   }
 
   /** Hand some of my own chips to a friend. */

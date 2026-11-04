@@ -4,6 +4,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
+import { setupRename } from "./rename.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
@@ -442,10 +443,11 @@ function render() {
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me });
+const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
 $("rulesbtn").addEventListener("click", () => { $("rulesm").hidden = false; });
-$("acctbtn").addEventListener("click", () => { $("acctmail").textContent = user?.email || ""; $("acctm").hidden = false; });
+$("acctbtn").addEventListener("click", () => { $("acctmail").textContent = user?.email || ""; rename.reset(); $("acctm").hidden = false; });
 $("signout").addEventListener("click", () => { $("acctm").hidden = true; signOut(auth); });
 
 /* ================= stats ================= */

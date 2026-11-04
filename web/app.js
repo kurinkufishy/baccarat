@@ -4,6 +4,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
+import { setupRename } from "./rename.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 10000000;
@@ -404,7 +405,7 @@ let midKey = "";
 function renderMid() {
   let h;
   if (gate !== "in") h = '<span class="note">ログインすると参加できるよ</span>';
-  else if (!seated()) h = `<form class="join" id="joinf"><input id="joinname" placeholder="ニックネーム" maxlength="12" autocomplete="off" value="${esc(players[me]?.name || "")}"><button class="go" type="submit">着席</button></form>`;
+  else if (!seated()) h = `<form class="join" id="joinf"><span class="note">${esc(players[me]?.name || "")} で</span><button class="go" type="submit">着席</button></form>`;
   else {
     const stake = myStake(), open = bettingOpen(), last = players[me]?.lastBets;
     const rep = stake ? "2倍" : "リピート", repDis = !open || (!stake && !(last && sum(last)));
@@ -456,10 +457,11 @@ function render() {
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me });
+const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
 $("rulesbtn").addEventListener("click", () => { $("rulesm").hidden = false; });
-$("acctbtn").addEventListener("click", () => { $("acctmail").textContent = user?.email || ""; $("leavebtn").hidden = !seated(); $("acctm").hidden = false; });
+$("acctbtn").addEventListener("click", () => { $("acctmail").textContent = user?.email || ""; rename.reset(); $("leavebtn").hidden = !seated(); $("acctm").hidden = false; });
 $("leavebtn").addEventListener("click", async () => { $("acctm").hidden = true; try { want = null; ackWant = null; await call("leave"); } catch (e) { flash(errMsg(e)); } });
 $("signout").addEventListener("click", () => { $("acctm").hidden = true; signOut(auth); });
 
@@ -520,7 +522,7 @@ async function doJoin(name) {
   catch (e) { gateErr = errMsg(e); flash(gateErr); }
   joining = false; render();
 }
-$("mid").addEventListener("submit", (e) => { e.preventDefault(); const n = $("joinname").value.trim(); if (n) doJoin(n); });
+$("mid").addEventListener("submit", (e) => { e.preventDefault(); doJoin(players[me]?.name || "?"); });
 $("gatebox").addEventListener("submit", (e) => { e.preventDefault(); const n = $("gname").value.trim(); if (n) doJoin(n); });
 $("gatebox").addEventListener("click", async (e) => {
   if (e.target.closest("#gout")) { signOut(auth); return; }

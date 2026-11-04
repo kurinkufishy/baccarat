@@ -259,3 +259,7 @@ a.ib{text-decoration:none}
 .cform input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px}
 .cform .go{padding:0 14px;border-radius:8px}
 @media (max-width:640px){.chatp{position:fixed;top:auto;left:0;right:0;bottom:0;width:auto;height:min(60vh,460px);border-radius:14px 14px 0 0;z-index:45;background:var(--panel);padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px))}.chatp .ct{font-size:13px}.cticker{top:48px;max-width:70%}}
+.rnbox{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}
+.rnrow{display:flex;gap:6px}
+.rnrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px;font:inherit;font-size:16px;font-weight:600}
+.rnbox .small{margin:0}
