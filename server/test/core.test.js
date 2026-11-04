@@ -298,3 +298,25 @@ test("rename costs 1M, names stay unique, re-seating keeps the name", () => {
   assert.equal(c.d.players.a.name, "あきら", "join never renames an existing player");
   assert.equal(c.d.players.a.seated, true);
 });
+
+test("achievements unlock on the server", async () => {
+  const A = await import("../src/ach.js");
+  const c = new Core(freshData());
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  c.handle("b", "", "join", { name: "い" }, 0);
+  const a = () => c.d.players.a;
+  // all-in tie win with both pairs on a rigged coup: P = 5S 5H, B = 4D 4C... both 0? use 7s and 2s: P 7S 7H (4), B 7D 7C (4) -> tie, both pairs
+  c.d.bacShoe = "2S".repeat(60) + ["7S", "7D", "7H", "7C"].reverse().join("");
+  c.handle("a", "", "setBets", { bets: { tie: 9000, ppair: 500, bpair: 500 }, round: 1 }, 100);
+  c.step(100 + G.BET_MS + 1);
+  const got = Object.keys(a().ach || {});
+  for (const id of ["tie", "pair", "dpair", "allin", "win1m"].slice(0, 4)) assert.ok(got.includes(id), id + " in " + got);
+  c.takeChanges();
+  assert.ok(a().ach.bac1, "totals checked on commit");
+  c.handle("a", "", "chat", { text: "やあ" }, 200_000);
+  c.handle("a", "", "give", { amount: 1, to: "b" }, 200_000);
+  assert.ok(a().ach.chat && a().ach.give);
+  assert.equal(A.ACH.length, new Set(A.ACH.map((x) => x.id)).size, "ids unique");
+  assert.ok(c.fullState().achDefs.length >= 20);
+  const p = {}; for (let i = 0; i < 5; i++) A.streak(p, "b", 10); assert.equal(p.ax.b, 5); A.streak(p, "b", 0); assert.equal(p.ax.b, 5); A.streak(p, "b", -1); assert.equal(p.ax.b, -1);
+});

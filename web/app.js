@@ -5,6 +5,7 @@ import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
+import { setupAch } from "./ach.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 10000000;
@@ -374,7 +375,7 @@ function renderRoads() {
 const netOf = (p) => p.chips + (p.id === me ? sum(serverMyBets()) : (betsMap[p.id] && betsMap[p.id].round === state.round ? betsMap[p.id].total : 0)) - START - (p.dep || 0);
 function renderSide(list) {
   const on = gate === "in";
-  $("sidebtn").hidden = !on; $("statsbtn").hidden = !on; chat.live(on);
+  $("sidebtn").hidden = !on; $("statsbtn").hidden = !on; chat.live(on); ach.update(on);
   $("side").hidden = !(on && sideOpen); $("sidebtn").classList.toggle("on", sideOpen); $("sidebtn").setAttribute("aria-pressed", sideOpen);
   $("sidebtn").textContent = `メンバー ${list.length}`;
   if (!on || !sideOpen) return;
@@ -457,6 +458,7 @@ function render() {
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me });
+const ach = setupAch({ esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => !!animating });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
@@ -566,7 +568,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs); ach.reset(); players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
   firstState = true; setTable(st.bac);
   gate = players[me] ? "in" : "join";
   render();

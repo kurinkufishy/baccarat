@@ -24,6 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Stamp every script/style link with this commit so browsers never mix an old cached file with a new one.
+      - name: Cache-bust
+        run: |
+          V=${GITHUB_SHA::8}
+          sed -i -E "s#(from \"\./[a-z0-9-]+\.js)\"#\1?v=$V\"#g" web/*.js
+          sed -i -E "s#(src=\"[a-z0-9-]+\.js)\"#\1?v=$V\"#g; s#(href=\"[a-z0-9-]+\.css)\"#\1?v=$V\"#g" web/*.html
+          grep -ho 'v=[0-9a-f]*' web/*.js web/*.html | sort | uniq -c
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

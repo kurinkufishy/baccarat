@@ -3,6 +3,7 @@
 // so each action is atomic without transactions.
 import * as G from "./game.js";
 import * as B from "./bjgame.js";
+import * as A from "./ach.js";
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -28,7 +29,12 @@ export class Core {
   }
   mark(...keys) { keys.forEach((k) => this.changed.add(k)); }
   player(uid) { const p = this.d.players[uid]; if (!p) fail("先に参加してね"); return p; }
-  takeChanges() { const c = this.changed; this.changed = new Set(); return c; }
+  takeChanges() {
+    const c = this.changed;
+    for (const k of c) if (k.startsWith("p:") && this.d.players[k.slice(2)]) A.checkTotals(this.d.players[k.slice(2)], Date.now());
+    this.changed = new Set();
+    return c;
+  }
 
   /* ---------------- dispatch ---------------- */
   handle(uid, email, type, m, now) {
@@ -42,7 +48,7 @@ export class Core {
       case "bjBet": return this.bjBet(uid, m.amount, m.round, now);
       case "bjAct": return this.bjAct(uid, m.action, m.round, m.turn, now);
       case "chat": return this.chat(uid, m.text, now);
-      case "rename": return this.rename(uid, m.name);
+      case "rename": return this.rename(uid, m.name, now);
       default: fail("その操作はできないよ");
     }
   }
@@ -82,12 +88,13 @@ export class Core {
     if (amount > debt) fail(`借金（${debt.toLocaleString("ja-JP")}）より多くは返せないよ`);
     if (amount > p.chips) fail("チップが足りない");
     p.chips -= amount; q.dep = debt - amount;
-    if (to !== uid) q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5);
+    if (to !== uid) { q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5); A.unlock(p, "help", now); }
+    else if (q.dep === 0) A.unlock(p, "clean", now);
     this.mark("p:" + uid, "p:" + to);
   }
 
   /** Change my nickname for RENAME_COST chips. */
-  rename(uid, rawName) {
+  rename(uid, rawName, now) {
     const p = this.player(uid);
     let name;
     try { name = G.cleanName(rawName); } catch { fail("名前は1〜12文字で入れてね"); }
@@ -95,6 +102,7 @@ export class Core {
     if (this.nameTaken(name, uid)) fail("その名前はもう使われてるよ");
     if (p.chips < RENAME_COST) fail(`チップが足りない（名前の変更は ${RENAME_COST.toLocaleString("ja-JP")}）`);
     p.chips -= RENAME_COST; p.name = name;
+    A.unlock(p, "rename", now);
     this.mark("p:" + uid);
   }
 
@@ -108,6 +116,7 @@ export class Core {
     if (amount > p.chips) fail("チップが足りない（ベット中の分は使えないよ）");
     p.chips -= amount; add(q, amount);
     q.gifts = [{ from: uid, amount, at: now }, ...(q.gifts || [])].slice(0, 5);
+    A.unlock(p, "give", now);
     this.mark("p:" + uid, "p:" + to);
   }
 
@@ -124,6 +133,7 @@ export class Core {
     const last = this.d.chat[this.d.chat.length - 1];
     this.d.chat.push({ id: (last ? last.id : 0) + 1, uid, name: p.name, color: p.color, text, at: now });
     if (this.d.chat.length > CHAT_KEEP) this.d.chat = this.d.chat.slice(-CHAT_KEEP);
+    if (A.unlock(p, "chat", now)) this.mark("p:" + uid);
     this.mark("chat");
   }
 
@@ -169,6 +179,16 @@ export class Core {
         const b = bd.bets, stake = G.sum(b), ret = G.payout(b, r), d = ret - stake;
         const st = p.st || freshStats();
         st.n++; st.wag += stake; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+        A.checkResult(p, d, p.chips === 0, now);
+        if (r.pp && b.ppair > 0 || r.bp && b.bpair > 0) A.unlock(p, "pair", now);
+        if (r.pp && r.bp && b.ppair > 0 && b.bpair > 0) A.unlock(p, "dpair", now);
+        if (r.w === "T" && b.tie > 0) A.unlock(p, "tie", now);
+        const winCards = r.w === "P" ? coup.P : r.w === "B" ? coup.B : null, winBet = r.w === "P" ? b.player : r.w === "B" ? b.banker : 0;
+        if (winCards && winCards.length === 2 && G.tot(winCards) === 9 && winBet > 0) A.unlock(p, "nat", now);
+        const sk = A.streak(p, "b", d);
+        if (sk >= 5) A.unlock(p, "streak5", now);
+        if (sk >= 10) A.unlock(p, "streak10", now);
+        if (sk <= -10) A.unlock(p, "lose10", now);
         Object.assign(p, {
           chips: Math.min(p.chips + ret, G.MAX_CHIPS), lastRound: t.round, lastDelta: d, lastRet: ret, lastBets: b, st,
           hist: [{ r: t.round, stake, d, w: r.w }, ...(p.hist || [])].slice(0, 12),
@@ -234,6 +254,11 @@ export class Core {
       if (!p) continue;
       const st = p.bjst || freshStats();
       st.n++; st.wag += h.bet; st.prof += h.d; if (h.d > 0) st.w++; else if (h.d < 0) st.l++; else st.p++;
+      A.checkResult(p, h.d, p.chips === 0, now);
+      if (h.status === "bj") A.unlock(p, "bjbj", now);
+      if (h.doubled && h.d > 0) A.unlock(p, "bjdbl", now);
+      if (h.cards.length >= 5 && B.total(h.cards).total === 21) A.unlock(p, "bj5", now);
+      if (A.streak(p, "j", h.d) >= 5) A.unlock(p, "bjstreak5", now);
       Object.assign(p, {
         chips: Math.min(p.chips + ret, G.MAX_CHIPS), bjLast: { round: t.round, d: h.d, ret, bet: h.bet }, bjst: st,
         bjhist: [{ r: t.round, bet: h.bet, d: h.d, out }, ...(p.bjhist || [])].slice(0, 12),
@@ -403,6 +428,6 @@ export class Core {
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat") };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH };
   }
 }

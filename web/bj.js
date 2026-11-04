@@ -5,6 +5,7 @@ import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
+import { setupAch } from "./ach.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
@@ -429,7 +430,7 @@ function render() {
   mb.hidden = !(live && importAvail);
   if (!mb.hidden) { const k = importing ? "1" : "0"; if (mb.dataset.k !== k) { mb.dataset.k = k; mb.innerHTML = `<span>前のサーバーのチップと借金がまだ引き継がれてないよ。前に遊んでた人なら押してね。</span><button class="go" id="mimport" ${importing ? "disabled" : ""}>${importing ? "引き継ぎ中…" : "引き継ぐ"}</button>`; } }
   $("roundtxt").textContent = live ? `#${t.round}` : "";
-  $("statsbtn").hidden = !live; chat.live(live);
+  $("statsbtn").hidden = !live; chat.live(live); ach.update(live);
   $("bal").textContent = live && players[me] ? fmt(myFree()) : "—";
   const mine = (t.hands || []).find((h) => h.uid === me);
   $("mytotal").textContent = fmt(live ? (mine ? mine.bet : myBet()) : 0);
@@ -443,6 +444,7 @@ function render() {
 /* ================= wallet ================= */
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me });
+const ach = setupAch({ esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => animating > 0 || (t.phase === "result" && sNow() < (t.animUntil || 0)) });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
 addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".overlay").forEach((o) => (o.hidden = true)); });
@@ -546,7 +548,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs); ach.reset(); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
   Object.keys(els).forEach((k) => { els[k].remove(); delete els[k]; });
   firstState = true; setTable(st.bj);
   gate = players[me] ? "in" : "join";

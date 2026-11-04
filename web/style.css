@@ -263,3 +263,34 @@ a.ib{text-decoration:none}
 .rnrow{display:flex;gap:6px}
 .rnrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:10px;font:inherit;font-size:16px;font-weight:600}
 .rnbox .small{margin:0}
+
+/* ---------- achievements ---------- */
+.achmodal{width:min(560px,100%);gap:10px}
+.achsum{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.achsum b{font-size:22px;color:var(--text)}
+.achbar{height:6px;border-radius:3px;background:var(--panel2);overflow:hidden}
+.achbar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold))}
+.achgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.achc{display:flex;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:9px 10px;opacity:.55;border:1px solid transparent}
+.achc.on{opacity:1}
+.achc div{display:flex;flex-direction:column;min-width:0}
+.achc b{font-size:13px}.achc span{font-size:11px;color:var(--muted);line-height:1.35}.achc small{font-size:10px;color:var(--muted);margin-top:2px}
+.medal{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:17px;font-weight:800;color:#8d939b;background:#3a3f47}
+.achc.on .medal,.achtoast .medal{color:rgba(40,24,4,.75)}
+.t1 .medal{--m1:#e0a37a;--m2:#9a5b34}.t2 .medal{--m1:#eef2f6;--m2:#8c96a1}.t3 .medal{--m1:#ffe08a;--m2:#c08a1f}
+.achc.on .medal,.achtoast .medal{background:radial-gradient(circle at 35% 30%,var(--m1),var(--m2));box-shadow:0 0 0 2px rgba(0,0,0,.25) inset}
+.achc.on.t3{border-color:color-mix(in srgb,var(--gold) 45%,transparent)}
+.achrank{display:flex;flex-direction:column;gap:6px}
+.achr{display:flex;align-items:center;gap:8px;background:var(--panel2);border-radius:8px;padding:8px 10px}
+.achr.me{outline:1px solid var(--gold)}
+.achr .rk{width:18px;color:var(--muted);font-weight:700;text-align:center}
+.achr .n{flex:1;min-width:0;display:flex;flex-direction:column;font-weight:700;font-size:13px}
+.achr .n small{font-weight:500;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.achr .c{font-weight:800;font-size:16px}.achr .c small{font-size:11px;color:var(--gold);margin-left:3px}
+.achtoast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;display:flex;gap:12px;align-items:center;background:rgba(14,16,20,.95);border:1px solid color-mix(in srgb,var(--gold) 50%,transparent);border-radius:12px;padding:10px 16px 10px 10px;box-shadow:0 12px 34px rgba(0,0,0,.55);animation:achin .35s cubic-bezier(.2,.9,.3,1.3);max-width:calc(100vw - 32px)}
+.achtoast .medal{width:42px;height:42px;font-size:20px}
+.achtoast div{display:flex;flex-direction:column}
+.achtoast small{font-size:10px;color:var(--gold);font-weight:700;letter-spacing:.04em}
+.achtoast b{font-size:16px}.achtoast span{font-size:11px;color:var(--muted)}
+@keyframes achin{from{opacity:0;transform:translate(-50%,-12px) scale(.96)}}
+@media (prefers-reduced-motion:reduce){.achtoast{animation:none}}
