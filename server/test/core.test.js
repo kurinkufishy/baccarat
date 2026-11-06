@@ -8,6 +8,7 @@ const { BJ } = B;
 
 let clock = 1_000_000;
 const core = new Core(freshData());
+core.step(0); // make the first race card now so it does not show up in later step() results
 const act = (type, uid, m = {}) => core.handle(uid, uid + "@example.com", type, m, clock);
 const no = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
 const P = (u) => core.d.players[u];
@@ -116,6 +117,7 @@ test("allow-list blocks strangers", () => {
 
 /* ---------------- blackjack ---------------- */
 const bj = new Core(freshData());
+bj.step(0);
 let now = 5_000_000;
 const ba = (type, uid, m = {}) => bj.handle(uid, "", type, m, now);
 const T = () => structuredClone(bj.d.bj);
@@ -403,4 +405,39 @@ test("FX price walk stays sane", async () => {
   let p = F.FX.START, lo = p, hi = p;
   for (let i = 0; i < 100_000; i++) { p = F.nextPrice(p); lo = Math.min(lo, p); hi = Math.max(hi, p); }
   assert.ok(lo > 100 && hi < 220, `range ${lo}..${hi}`);
+});
+
+test("horse racing: card, bets, race, payout", async () => {
+  const R = await import("../src/race.js");
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  c.handle("b", "", "join", { name: "い" }, 0);
+  let now = 1_000_000;
+  c.step(now);
+  const r = () => c.d.rc;
+  assert.equal(r().card.horses.length, 8);
+  assert.ok(r().card.horses.every((h) => h.odds >= 1.1 && h.podds >= 1.1 && h.pop >= 1));
+  const v = c.view("rc"); assert.equal(v.card.horses[0].s, undefined, "strengths stay on the server");
+  nc(() => c.handle("a", "", "rcBets", { bets: { w9: 100 }, round: 1 }, now), /馬券/);
+  nc(() => c.handle("a", "", "rcBets", { bets: { w1: 50 }, round: 1 }, now), /100/);
+  nc(() => c.handle("a", "", "rcBets", { bets: { w1: 20000 }, round: 1 }, now), /足りない/);
+  const all = Object.fromEntries(r().card.horses.map((h) => ["w" + h.n, 1000]));
+  c.handle("a", "", "rcBets", { bets: all, round: 1 }, now);
+  c.handle("b", "", "rcBets", { bets: { p1: 2000, p2: 2000, p3: 2000 }, round: 1 }, now);
+  assert.equal(c.d.players.a.chips, 2000); assert.equal(r().phase, "betting");
+  now += R.RC.BET_MS; c.step(now);
+  assert.equal(r().phase, "racing"); assert.equal(r().script.pos.length, 8);
+  nc(() => c.handle("a", "", "rcBets", { bets: {}, round: 1 }, now), /締切/);
+  now = r().endAt; c.step(now);
+  assert.equal(r().phase, "result");
+  const w = r().card.horses[r().order[0]];
+  assert.equal(c.d.players.a.chips, 2000 + Math.floor(1000 * w.odds), "exactly the winner's win ticket pays");
+  const top3 = r().order.slice(0, 3);
+  const bPaid = [0, 1, 2].filter((i) => top3.includes(i)).reduce((s, i) => s + Math.floor(2000 * r().card.horses[i].podds), 0);
+  assert.equal(c.d.players.b.chips, 4000 + bPaid);
+  assert.ok(c.d.players.a.ach.rc1 && c.d.players.a.ach.rcall);
+  assert.equal(r().history.length, 1);
+  now = r().holdUntil; c.step(now);
+  assert.equal(r().round, 2); assert.equal(r().phase, "betting"); assert.equal(r().card.round, 2);
 });

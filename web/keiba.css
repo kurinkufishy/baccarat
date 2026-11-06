@@ -1,0 +1,69 @@
+/* Horse racing: side view of the home straight, camera follows the leader */
+.stage.keiba{aspect-ratio:16/7.4;background:linear-gradient(#7cc8ff 0%,#bfe6ff 22%,#d8f0ff 23%)}
+@media (max-width:640px){.stage.keiba{aspect-ratio:1/1.05}}
+.track{position:absolute;left:0;right:0;top:23%;bottom:0;overflow:hidden}
+.turf{position:absolute;inset:0;background:repeating-linear-gradient(90deg,#2f8f3f 0 60px,#38a24a 60px 120px);box-shadow:inset 0 10px 18px rgba(0,0,0,.18)}
+.turf::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.15)}
+.poles{position:absolute;inset:0;pointer-events:none}
+.pole{position:absolute;top:-14px;bottom:0;width:2px;background:linear-gradient(rgba(255,255,255,.95),rgba(255,255,255,.25))}
+.pole span{position:absolute;top:-2px;left:4px;font-size:10px;font-weight:800;color:#0f3a1a;background:rgba(255,255,255,.85);border-radius:3px;padding:0 4px;white-space:nowrap}
+.pole.goal{width:4px;background:repeating-linear-gradient(#fff 0 8px,#d7263d 8px 16px)}
+.pole.goal span{background:#d7263d;color:#fff}
+.lanes{position:absolute;left:0;right:0;top:10px;bottom:6px;display:flex;flex-direction:column}
+.lane{flex:1;position:relative;border-bottom:1px dashed rgba(255,255,255,.12)}
+.horse{position:absolute;left:0;top:50%;height:min(48px,92%);aspect-ratio:64/44;margin-top:calc(min(48px,92%) / -2);will-change:transform}
+.hsvg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 3px 2px rgba(0,0,0,.35))}
+.hsvg .lg{stroke-width:3.2;stroke-linecap:round;fill:none;stroke:#3a2414;transform-box:fill-box;transform-origin:top center}
+.horse.run .hsvg{animation:hbob .32s ease-in-out infinite}
+.horse.run .l1,.horse.run .l3{animation:hleg .32s ease-in-out infinite}
+.horse.run .l2,.horse.run .l4{animation:hleg .32s ease-in-out infinite reverse}
+@keyframes hleg{0%{transform:rotate(28deg)}50%{transform:rotate(-30deg)}100%{transform:rotate(28deg)}}
+@keyframes hbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.hn{position:absolute;right:100%;top:50%;transform:translateY(-50%);margin-right:2px;font-size:10px;font-weight:800;color:#fff;background:rgba(0,0,0,.45);border-left:3px solid var(--c);border-radius:3px;padding:0 4px;white-space:nowrap;opacity:.9}
+@media (max-width:640px){.hn{display:none}}
+@media (prefers-reduced-motion:reduce){.horse.run .hsvg,.horse.run .lg{animation:none}}
+.keiba #pill{top:auto;bottom:10px}
+.pill.msg{background:rgba(0,0,0,.72);padding:7px 16px;border-radius:999px;font-size:14px;color:#fff;border:1px solid rgba(255,255,255,.12)}
+.pill.msg b{color:var(--gold);font-size:16px}
+.pill.msg.hurry b{color:#ff7a84}
+.nb{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:5px;background:var(--c);color:var(--i);font-weight:900;font-size:12px;border:1px solid rgba(0,0,0,.25);font-variant-numeric:tabular-nums}
+.nb.sm{min-width:17px;height:17px;font-size:10px;border-radius:4px}
+.podium{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:6;background:rgba(10,12,16,.88);border:1px solid rgba(217,181,107,.45);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:min(340px,86%);box-shadow:0 18px 40px rgba(0,0,0,.5);animation:podin .3s ease-out}
+@keyframes podin{from{opacity:0}}
+.pod{display:flex;flex-direction:column;gap:6px}
+.pr{display:flex;align-items:center;gap:8px;font-size:14px}
+.pr .rank{width:34px;font-weight:900;color:var(--muted)}.pr.p1 .rank{color:var(--gold)}
+.pr.p1 b{font-size:17px}
+.pr .od{margin-left:auto;font-size:12px;color:var(--muted)}
+.mine{font-weight:800;text-align:center;border-top:1px solid var(--line);padding-top:8px}
+.up{color:var(--go)}.dn{color:#ff7a84}
+
+.kconsole{display:grid;grid-template-columns:1.5fr 1fr;gap:10px}
+@media (max-width:760px){.kconsole{grid-template-columns:1fr}}
+.kp{background:var(--panel);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.kh{font-weight:800;font-size:13px;display:flex;gap:8px;align-items:baseline}
+.kh .mut{font-weight:600;font-size:12px}
+.kside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.ktable{display:flex;flex-direction:column;gap:4px}
+.krow{display:grid;grid-template-columns:26px 1fr 84px 84px;gap:6px;align-items:center;background:var(--panel2);border-radius:8px;padding:5px 6px;border:1px solid transparent}
+.krow.won{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,var(--panel2))}
+.krow.placed{border-color:rgba(255,255,255,.18)}
+.kn{display:flex;flex-direction:column;min-width:0}
+.kn b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kn small{font-size:10px;color:var(--muted)}.kn em{font-style:normal;color:var(--gold);font-weight:800}
+.kb{position:relative;background:#262c35;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:4px 4px;display:flex;flex-direction:column;align-items:center;cursor:pointer;font:inherit;line-height:1.15}
+.kb small{font-size:9px;color:var(--muted)}.kb b{font-size:14px}
+.kb.has{border-color:var(--go);background:color-mix(in srgb,var(--go) 16%,#262c35)}
+.kb i{position:absolute;top:-7px;right:-4px;font-style:normal;font-size:9px;font-weight:900;background:var(--go);color:#062312;border-radius:999px;padding:1px 5px}
+.kb:disabled{cursor:default;opacity:.65}
+.kb:not(:disabled):hover{border-color:var(--gold)}
+.klist,.khist{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto}
+.trow{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--panel2);border-radius:7px;padding:5px 7px;flex-wrap:wrap}
+.trow .n{font-weight:700}
+.trow .tk{display:flex;flex-wrap:wrap;gap:4px 8px;margin-left:auto}
+.trow .tk span{display:inline-flex;align-items:center;gap:2px}
+.hrow{display:flex;align-items:center;gap:4px;font-size:12px}
+.hrow .mut{width:34px}.hrow .hn2{margin-left:4px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.hrow .od{color:var(--gold);font-weight:800}
+.mid .note.small{font-size:11px;color:var(--muted)}
+.kp .empty{padding:8px 4px}

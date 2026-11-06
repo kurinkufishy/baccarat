@@ -5,6 +5,7 @@ import * as G from "./game.js";
 import * as B from "./bjgame.js";
 import * as A from "./ach.js";
 import * as F from "./fxgame.js";
+import * as R from "./race.js";
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -13,7 +14,8 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx() });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {} });
+export const freshRc = () => ({ round: 1, phase: "paused", closesAt: 0, card: null, startAt: 0, endAt: 0, holdUntil: 0, unit: 0, script: null, res: null, history: [], idle: 0, hadBets: false });
 const RENAME_COST = 1_000_000;
 const CHAT_KEEP = 50, CHAT_MAX = 120, CHAT_GAP_MS = 400;
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
@@ -51,6 +53,7 @@ export class Core {
       case "chat": return this.chat(uid, m.text, now);
       case "rename": return this.rename(uid, m.name, now);
       case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
+      case "rcBets": return this.rcSetBets(uid, m.bets, m.round, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
       case "fxClose": return this.fxClose(uid, m.pos, now);
       case "setBubble": return this.setLook(uid, "bubble", A.BUBBLES, m.bubble);
@@ -396,15 +399,16 @@ export class Core {
   step(now) {
     const did = [];
     for (let i = 0; i < 6; i++) {
-      const a = this.bacStep(now), b = this.bjStep(now);
+      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now);
       if (a) did.push("bac:" + a);
       if (b) did.push("bj:" + b);
-      if (!a && !b) break;
+      if (c) did.push("rc:" + c);
+      if (!a && !b && !c) break;
     }
     return did;
   }
   nextDue() {
-    const ts = [this.bacDue(), this.bjDue()].filter((x) => x !== null);
+    const ts = [this.bacDue(), this.bjDue(), this.rcDue()].filter((x) => x !== null);
     return ts.length ? Math.min(...ts) : null;
   }
 
@@ -451,6 +455,86 @@ export class Core {
     }
     if (changed) this.mark("meta");
     return done;
+  }
+
+  /* ---------------- horse racing ---------------- */
+  rcOpen(now) { const r = this.d.rc; return !!r.card && (r.phase === "paused" || (r.phase === "betting" && now < r.closesAt)); }
+  rcSetBets(uid, raw, round, now) {
+    let want;
+    try { want = R.cleanBets(raw); } catch (e) { fail(e === "too-small" ? `1点 ${R.RC.MIN_BET} から` : "馬券がおかしいよ"); }
+    const p = this.player(uid), r = this.d.rc;
+    if (!this.rcOpen(now)) fail("締切。次のレースを待ってね");
+    if (round !== r.round) fail("レースが進んだので、もう一度買ってね");
+    const cur = this.d.rcBets[uid] && this.d.rcBets[uid].round === r.round ? this.d.rcBets[uid].bets : {};
+    const delta = R.sumBets(want) - R.sumBets(cur);
+    if (delta > p.chips) fail("チップが足りない。残高の＋から借りられるよ");
+    p.chips -= delta;
+    if (R.sumBets(want) > 0) this.d.rcBets[uid] = { round: r.round, bets: want, total: R.sumBets(want), at: now };
+    else delete this.d.rcBets[uid];
+    if (r.phase === "paused" && R.sumBets(want) > 0) { r.phase = "betting"; r.closesAt = now + R.RC.BET_MS; r.idle = 0; this.mark("rc"); }
+    this.mark("p:" + uid, "rcBets");
+  }
+  rcStep(now) {
+    const r = this.d.rc || (this.d.rc = freshRc());
+    if (!r.card) { r.card = R.newRace(r.round, now); this.mark("rc"); return "card"; }
+    if (r.phase === "betting" && now >= r.closesAt) {
+      const sim = R.simulate(r.card.horses);
+      const unit = R.RC.WIN_MS / sim.fin[sim.order[0]];
+      const startAt = now + 2500;
+      Object.assign(r, {
+        phase: "racing", startAt, unit,
+        endAt: startAt + Math.ceil(Math.max(...sim.fin) * unit) + 1200,
+        script: { pos: sim.pos.map((a) => a.map((x) => Math.round(x * 10000) / 10000)), fin: sim.fin.map((x) => Math.round(x * 1000) / 1000) },
+        order: sim.order, hadBets: Object.values(this.d.rcBets).some((b) => b.round === r.round && b.total > 0),
+      });
+      this.mark("rc");
+      return "start";
+    }
+    if (r.phase === "racing" && now >= r.endAt) {
+      const order = r.order, horses = r.card.horses;
+      for (const [uid, bd] of Object.entries(this.d.rcBets)) {
+        delete this.d.rcBets[uid];
+        const p = this.d.players[uid];
+        if (!p || bd.round !== r.round || !bd.total) continue;
+        const ret = R.payout(bd.bets, horses, order), d = ret - bd.total;
+        const st = p.rcst || freshStats();
+        st.n++; st.wag += bd.total; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+        Object.assign(p, {
+          chips: Math.min(p.chips + ret, G.MAX_CHIPS), rcst: st, rcLast: { round: r.round, d, ret, stake: bd.total },
+          rccurve: [...(p.rccurve || []), st.prof].slice(-300),
+          rchist: [{ r: r.round, stake: bd.total, d, win: order[0] + 1 }, ...(p.rchist || [])].slice(0, 12),
+        });
+        A.checkResult(p, d, false, now);
+        A.unlock(p, "rc1", now);
+        if (st.n >= 100) A.unlock(p, "rc100", now);
+        const w = horses[order[0]];
+        if (bd.bets["w" + w.n] && w.pop === 1) A.unlock(p, "rcfav", now);
+        if (bd.bets["w" + w.n] && w.odds >= 20) A.unlock(p, "rclong", now);
+        if (horses.every((h) => bd.bets["w" + h.n])) A.unlock(p, "rcall", now);
+        this.mark("p:" + uid);
+      }
+      r.res = { order: order.map((i) => i + 1) };
+      r.history = [...(r.history || []), { r: r.round, top: order.slice(0, 3).map((i) => i + 1), name: horses[order[0]].name, odds: horses[order[0]].odds }].slice(-20);
+      Object.assign(r, { phase: "result", holdUntil: now + R.RC.HOLD_MS });
+      this.mark("rc", "rcBets");
+      return "finish";
+    }
+    if (r.phase === "result" && now >= r.holdUntil) {
+      const idle = r.hadBets ? 0 : (r.idle || 0) + 1, paused = idle >= R.RC.IDLE_LIMIT;
+      const round = (r.round || 1) + 1;
+      Object.assign(r, { round, card: R.newRace(round, now), script: null, order: null, res: null, startAt: 0, endAt: 0, idle, phase: paused ? "paused" : "betting", closesAt: paused ? 0 : now + R.RC.BET_MS });
+      this.mark("rc");
+      return "next";
+    }
+    return null;
+  }
+  rcDue() {
+    const r = this.d.rc;
+    if (!r || !r.card) return 0;
+    if (r.phase === "betting") return r.closesAt;
+    if (r.phase === "racing") return r.endAt;
+    if (r.phase === "result") return r.holdUntil;
+    return null;
   }
 
   /* ---------------- FX ---------------- */
@@ -516,12 +600,14 @@ export class Core {
     if (key === "bacBets") return d.bacBets;
     if (key === "bj") return d.bj; // the hole card lives in bjShoe, never here
     if (key === "bjBets") return d.bjBets;
+    if (key === "rc") { const r = d.rc; return { ...r, card: r.card && { round: r.card.round, horses: r.card.horses.map(({ s, e, ...h }) => h) } }; }
+    if (key === "rcBets") return d.rcBets;
     if (key === "meta") return { imported: !!d.meta.imported };
     if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }

@@ -30,6 +30,11 @@ export const ACH = [
   { id: "bjstreak10", tier: 3, name: "ディーラー殺し", desc: "ブラックジャックで10回続けて勝つ" },
   { id: "bj500", tier: 3, name: "ブラックジャックの主", desc: "ブラックジャックを500ゲーム遊ぶ" },
   { id: "both", tier: 1, name: "二刀流", desc: "バカラとブラックジャックの両方で勝負する" },
+  { id: "rc1", tier: 1, name: "はじめての馬券", desc: "競馬で初めて馬券を買う" },
+  { id: "rcfav", tier: 1, name: "鉄板", desc: "1番人気の単勝を当てる" },
+  { id: "rcall", tier: 1, name: "全頭買い", desc: "8頭すべての単勝を買う", secret: true },
+  { id: "rc100", tier: 2, name: "競馬通", desc: "競馬で100レース賭ける" },
+  { id: "rclong", tier: 3, name: "大穴", desc: "単勝20倍以上の馬を当てる" },
   { id: "fx1", tier: 1, name: "はじめてのFX", desc: "FXで初めて決済する" },
   { id: "fxlev", tier: 1, name: "ハイレバ", desc: "レバレッジ100倍で勝つ" },
   { id: "fxliq", tier: 1, name: "強制ロスカット", desc: "ロスカットされる", secret: true },
@@ -85,7 +90,7 @@ export function checkTotals(p, now) {
   on((p.dep || 0) >= 1e9, "debt1b"); on((p.dep || 0) >= 1e11, "debt100b");
   on(p.chips >= 1e10, "rich10b");
   on(st.n >= 1 && bj.n >= 1, "both"); on(bj.n >= 500, "bj500");
-  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0);
+  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0) + ((p.rcst && p.rcst.wag) || 0);
   on(wag >= 1e9, "wager1b"); on(wag >= 1e12, "wager1t");
   on(Object.keys(p.ach || {}).filter((id) => id !== "collector" && IDS.has(id)).length >= 30, "collector");
 }
