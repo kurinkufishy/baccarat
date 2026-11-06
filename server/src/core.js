@@ -4,6 +4,7 @@
 import * as G from "./game.js";
 import * as B from "./bjgame.js";
 import * as A from "./ach.js";
+import * as F from "./fxgame.js";
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -12,7 +13,7 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [] });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx() });
 const RENAME_COST = 1_000_000;
 const CHAT_KEEP = 50, CHAT_MAX = 120, CHAT_GAP_MS = 400;
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
@@ -50,6 +51,8 @@ export class Core {
       case "chat": return this.chat(uid, m.text, now);
       case "rename": return this.rename(uid, m.name, now);
       case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
+      case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
+      case "fxClose": return this.fxClose(uid, m.pos, now);
       case "setBubble": return this.setLook(uid, "bubble", A.BUBBLES, m.bubble);
       default: fail("その操作はできないよ");
     }
@@ -448,6 +451,62 @@ export class Core {
     }
     if (changed) this.mark("meta");
     return done;
+  }
+
+  /* ---------------- FX ---------------- */
+  /** Move the market one tick and stop out anyone whose position has lost its whole margin. */
+  fxTick(now) {
+    const fx = this.d.fx || (this.d.fx = F.freshFx());
+    const p = F.nextPrice(fx.price);
+    F.record(fx, now, p);
+    const liq = [];
+    for (const [uid, pl] of Object.entries(this.d.players)) {
+      if (!pl.fxPos || !pl.fxPos.length) continue;
+      for (const pos of [...pl.fxPos]) if (F.pnl(pos, p) <= -pos.margin) { this.fxSettle(uid, pl, pos, now, true); liq.push(uid); }
+    }
+    return { t: now, p, liq };
+  }
+  fxOpen(uid, side, margin, lev, now) {
+    const p = this.player(uid), fx = this.d.fx;
+    const s = side === "buy" ? 1 : side === "sell" ? -1 : 0;
+    if (!s) fail("買いか売りを選んでね");
+    if (!F.FX.LEVS.includes(lev)) fail("レバレッジがおかしいよ");
+    if (!isInt(margin) || margin < F.FX.MIN_MARGIN || margin > F.FX.MAX_MARGIN) fail(`証拠金は ${F.FX.MIN_MARGIN} から`);
+    if (margin > p.chips) fail("チップが足りない。残高の＋から借りられるよ");
+    if ((p.fxPos || []).length >= F.FX.MAX_POS) fail(`ポジションは${F.FX.MAX_POS}個まで。どれか決済してね`);
+    if (!fx || !fx.lastAt || now - fx.lastAt > F.FX.STALE_MS) fail("相場が止まってる。少し待ってからもう一度");
+    p.fxSeq = (p.fxSeq || 0) + 1;
+    p.chips -= margin;
+    p.fxPos = [...(p.fxPos || []), { id: p.fxSeq, side: s, margin, lev, entry: s > 0 ? F.ask(fx.price) : F.bid(fx.price), at: now }];
+    this.mark("p:" + uid);
+    return { id: p.fxSeq };
+  }
+  fxClose(uid, id, now) {
+    const p = this.player(uid), list = p.fxPos || [];
+    const targets = id === "all" ? [...list] : list.filter((x) => x.id === id);
+    if (!targets.length) fail("そのポジションはもうないよ");
+    let total = 0;
+    for (const pos of targets) total += this.fxSettle(uid, p, pos, now, false);
+    return { d: total };
+  }
+  fxSettle(uid, p, pos, now, liq) {
+    const price = this.d.fx.price, d = liq ? -pos.margin : F.pnl(pos, price);
+    p.fxPos = (p.fxPos || []).filter((x) => x.id !== pos.id);
+    p.chips = Math.min(p.chips + pos.margin + d, G.MAX_CHIPS);
+    const st = p.fxst || freshStats();
+    st.n++; st.wag += pos.margin; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+    p.fxst = st;
+    p.fxcurve = [...(p.fxcurve || []), st.prof].slice(-300);
+    p.fxhist = [{ side: pos.side, lev: pos.lev, margin: pos.margin, entry: pos.entry, exit: price, d, liq, at: now }, ...(p.fxhist || [])].slice(0, 12);
+    A.checkResult(p, d, false, now);
+    A.unlock(p, "fx1", now);
+    if (st.n >= 100) A.unlock(p, "fx100", now);
+    if (liq) A.unlock(p, "fxliq", now);
+    if (d > 0 && pos.lev === 100) A.unlock(p, "fxlev", now);
+    if (d >= pos.margin * 10) A.unlock(p, "fx10x", now);
+    if (d > 0 && pos.side < 0) { p.ax = p.ax || {}; p.ax.fxs = (p.ax.fxs || 0) + 1; if (p.ax.fxs >= 10) A.unlock(p, "fxshort", now); }
+    this.mark("p:" + uid);
+    return d;
   }
 
   /* ---------------- views sent to clients ---------------- */

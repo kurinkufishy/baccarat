@@ -361,3 +361,46 @@ test("more achievements: tie streak, counters, time of day, dressup", () => {
   c.handle("a", "", "setBubble", { bubble: "mint" }, now);
   assert.ok(a().ach.dressup);
 });
+
+test("FX: open, move, close, stop-out", async () => {
+  const F = await import("../src/fxgame.js");
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  const a = () => c.d.players.a;
+  nc(() => c.handle("a", "", "fxOpen", { side: "buy", margin: 1000, lev: 10 }, 1000), /止まって/);
+  c.fxTick(1000);
+  nc(() => c.handle("a", "", "fxOpen", { side: "up", margin: 1000, lev: 10 }, 1500), /買いか売り/);
+  nc(() => c.handle("a", "", "fxOpen", { side: "buy", margin: 1000, lev: 7 }, 1500), /レバレッジ/);
+  nc(() => c.handle("a", "", "fxOpen", { side: "buy", margin: 50, lev: 10 }, 1500), /100/);
+  nc(() => c.handle("a", "", "fxOpen", { side: "buy", margin: 20000, lev: 10 }, 1500), /足りない/);
+  c.handle("a", "", "fxOpen", { side: "buy", margin: 1000, lev: 100 }, 1500);
+  c.handle("a", "", "fxOpen", { side: "sell", margin: 1000, lev: 10 }, 1500);
+  assert.equal(a().chips, 8000); assert.equal(a().fxPos.length, 2);
+  // price up 1%: long x100 wins ~100% of margin (minus spread), short x10 loses ~10%
+  c.d.fx.price = Math.round(c.d.fx.price * 1.01 * 1000) / 1000;
+  const r = c.handle("a", "", "fxClose", { pos: "all" }, 2000);
+  assert.ok(a().chips > 10_700 && a().chips < 10_950, "chips " + a().chips + " d " + r.d);
+  assert.equal(a().fxPos.length, 0); assert.equal(a().fxst.n, 2);
+  assert.ok(a().ach.fx1 && a().ach.fxlev);
+  // stop-out: x100 long, price drops 2%
+  c.handle("a", "", "fxOpen", { side: "buy", margin: 1000, lev: 100 }, 2500);
+  const before = a().chips;
+  c.d.fx.price = Math.round(c.d.fx.price * 0.98 * 1000) / 1000;
+  const orig = F.nextPrice; // the tick moves price a little more; it's still far below the stop
+  const t = c.fxTick(3000);
+  assert.deepEqual(t.liq, ["a"]); assert.equal(a().chips, before); assert.ok(a().ach.fxliq);
+  assert.equal(a().fxhist[0].liq, true);
+  nc(() => c.handle("a", "", "fxClose", { pos: 99 }, 3500), /もうない/);
+  // the market history keeps 1-minute candles
+  for (let i = 0; i < 130; i++) c.fxTick(4000 + i * 1000);
+  assert.ok(c.d.fx.candles.length >= 2 && c.d.fx.ticks.length <= F.FX.KEEP_TICKS);
+  void orig;
+});
+
+test("FX price walk stays sane", async () => {
+  const F = await import("../src/fxgame.js");
+  let p = F.FX.START, lo = p, hi = p;
+  for (let i = 0; i < 100_000; i++) { p = F.nextPrice(p); lo = Math.min(lo, p); hi = Math.max(hi, p); }
+  assert.ok(lo > 100 && hi < 220, `range ${lo}..${hi}`);
+});

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com wss://*.workers.dev; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>仲間内FX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rubik:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="fx.css">
+<style>body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div class="app">
+  <div class="migbar" id="migbar" hidden></div>
+  <section class="stage fx" id="stage" aria-label="チャート">
+    <svg class="layer" id="chart" aria-hidden="true"></svg>
+    <div class="hud">
+      <div class="tname">仲間内FX <span class="pair">KURI/JPY</span><small>レバレッジ最大100倍 · 1秒ごとに更新</small></div>
+      <div class="icons">
+        <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
+        <button class="ib" id="statsbtn" aria-pressed="false" hidden>統計</button>
+        <a class="ib" href="./">バカラ</a>
+        <a class="ib" href="blackjack.html">ブラックジャック</a>
+        <button class="ib" id="rulesbtn">ルール</button>
+        <button class="ib acct" id="acctbtn" hidden></button>
+      </div>
+    </div>
+    <div class="quote" id="quote" aria-live="off"></div>
+    <div class="cmode" id="cmode" role="tablist"><button data-m="tick" class="on" role="tab">ティック</button><button data-m="candle" role="tab">1分足</button></div>
+    <div class="gate" id="gate">
+      <div class="gatebox" id="gatebox"><h1>FX</h1><p>接続中…</p></div>
+    </div>
+  </section>
+
+  <div class="fxconsole">
+    <section class="fxp order" aria-label="注文">
+      <div class="fxh">注文</div>
+      <div class="levs" id="levs" role="radiogroup" aria-label="レバレッジ"></div>
+      <div class="ordinfo" id="ordinfo"></div>
+      <div class="obtns"><button class="obuy" id="obuy" disabled><span>買い</span><b class="num" id="askp">—</b><small>上がると思う</small></button><button class="osell" id="osell" disabled><span>売り</span><b class="num" id="bidp">—</b><small>下がると思う</small></button></div>
+    </section>
+    <section class="fxp" aria-label="自分のポジション">
+      <div class="fxh">ポジション <span class="mut" id="poscount"></span><button class="ib sm" id="closeall" hidden>全部決済</button></div>
+      <div class="plist" id="plist"></div>
+    </section>
+    <section class="fxp" aria-label="みんな">
+      <div class="fxh">みんな</div>
+      <div class="plist" id="others"></div>
+    </section>
+  </div>
+
+  <div class="chipbar" id="chipbar">
+    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり・あげる）" disabled>+</button></div>
+    <div class="mid" id="mid"></div>
+    <div class="totbet"><span class="lb">証拠金</span><span class="amt num" id="mytotal">0</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="walletm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
+    <div class="mhead"><span id="wt">ウォレット</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="wsum"><div><span>残高</span><b class="num" id="wbal">0</b></div><div><span>借金</span><b class="num" id="wdebt">0</b></div></div>
+    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button><button data-w="give" role="tab">あげる</button></div>
+    <div class="wbody" id="wbody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="rulesm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rt">
+    <div class="mhead"><span id="rt">ルール</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="rules">
+      <b>しくみ</b>　架空の通貨ペア「KURI/JPY」の値段が1秒ごとに動く。上がると思ったら<b>買い</b>、下がると思ったら<b>売り</b>。好きなときに決済すると、そのときの値段との差で損益が決まる。<br>
+      <b>レバレッジ</b>　証拠金の何倍ぶん取引するか。100倍なら値段が1%動くだけで証拠金と同じ額だけ増えたり減ったりする。<br>
+      <b>ロスカット</b>　損が証拠金と同じになったら自動で決済されて、証拠金はなくなる。証拠金より多く負けることはない。<br>
+      <b>スプレッド</b>　買いは少し高く、売りは少し安く約定する（差は0.006円）。<br>
+      <b>相場</b>　値段はサーバーがランダムに作っていて、誰にも先は読めない。だれもFXの画面を開いていない間は相場が止まる。ポジションは5個まで。<br>
+      <b>チップ</b>　バカラ・ブラックジャックと同じ残高を使う。
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="acctm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="at">
+    <div class="mhead"><span id="at">アカウント</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="sumline"><span>ログイン中</span><span id="acctmail"></span></div>
+        <button class="ib" id="signout" style="justify-content:center;height:40px">ログアウト</button>
+  </div>
+</div>
+
+<div class="statsp" id="statsp" hidden role="region" aria-label="自分の統計">
+  <div class="mhead"><span>自分の統計</span><button class="x" id="statsx" aria-label="閉じる">×</button></div>
+  <div class="tiles">
+    <div class="tile"><span>利益</span><b class="num" id="s_prof">0</b></div>
+    <div class="tile"><span>賭け総額</span><b class="num" id="s_wag">0</b></div>
+    <div class="tile"><span>勝率</span><b class="num" id="s_rate">–</b></div>
+  </div>
+  <div class="winbar" id="winbar"></div>
+  <div class="legend2" id="wl"></div>
+  <div class="chartbox" id="chartbox"></div>
+  <p class="small">決済したトレードごとの累計利益。</p>
+</div>
+
+<script type="module" src="fx.js"></script>
+</body>
+</html>

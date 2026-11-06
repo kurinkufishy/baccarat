@@ -9,7 +9,8 @@ import { GRANTS } from "./grants.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose"]);
+const FX_WATCH_MS = 60_000; // a page counts as watching the FX market for this long after its last fxWatch
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
 function originOk(req, env) {
@@ -38,6 +39,7 @@ export class Casino extends DurableObject {
     this.env = env;
     this.core = null;
     this.buckets = new Map(); // ws -> {t, n}; in memory only, resets after hibernation, which is fine
+    this.fxTimer = null; this.fxTicks = 0;
     this.ready = ctx.blockConcurrencyWhile(() => this.load());
   }
 
@@ -49,7 +51,7 @@ export class Casino extends DurableObject {
       else d[k] = v;
     }
     const core = new Core(null, { allowedEmails: csv(this.env.ALLOWED_EMAILS) });
-    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat"]) if (d[k] !== undefined) core.d[k] = d[k];
+    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat", "fx"]) if (d[k] !== undefined) core.d[k] = d[k];
     core.d.players = d.players;
     this.core = core;
     core.applyGrants(GRANTS, Date.now());
@@ -136,6 +138,12 @@ export class Casino extends DurableObject {
     }
     if (!att.uid) { reply(false, { error: "ログインしてね" }); return; }
     if (m.type === "ping") { reply(true, {}); return; }
+    if (m.type === "fxWatch") {
+      ws.serializeAttachment({ ...att, fxAt: Date.now() });
+      this.fxEnsure();
+      reply(true, { data: this.core.d.fx });
+      return;
+    }
 
     if (m.type === "import") {
       try {
@@ -163,6 +171,25 @@ export class Casino extends DurableObject {
       if (e instanceof GameError) reply(false, { error: e.message });
       else { console.error(e); reply(false, { error: "うまくいかなかった。もう一度試してね" }); await this.load(); }
     }
+  }
+
+  /* The FX market ticks once a second, but only while some page is watching it (a plain timer, so it costs no requests). */
+  fxEnsure() {
+    if (this.fxTimer) return;
+    this.fxTimer = setInterval(() => this.fxStep(), 1000);
+    this.fxStep();
+  }
+  fxStep() {
+    try {
+      const now = Date.now();
+      const watchers = this.ctx.getWebSockets().filter((s) => { const a = s.deserializeAttachment() || {}; return a.uid && a.fxAt && now - a.fxAt < FX_WATCH_MS; });
+      if (!watchers.length) { clearInterval(this.fxTimer); this.fxTimer = null; this.ctx.storage.put("fx", this.core.d.fx); return; }
+      const r = this.core.fxTick(now);
+      const s = JSON.stringify({ type: "batch", now, msgs: [{ type: "fxTick", t: r.t, p: r.p }] });
+      for (const w of watchers) { try { w.send(s); } catch { /* closing */ } }
+      if (++this.fxTicks % 15 === 0) this.ctx.storage.put("fx", this.core.d.fx);
+      if (r.liq.length) this.commit().catch((e) => console.error(e));
+    } catch (e) { console.error(e); }
   }
 
   async webSocketClose(ws, code) { this.buckets.delete(ws); try { ws.close(code, "bye"); } catch { /* already closed */ } }
