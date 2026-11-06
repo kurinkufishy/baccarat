@@ -4,4 +4,5 @@
 // asDebt: true means it is booked like a normal "借りる": chips go up and so does their debt.
 export const GRANTS = [
   { id: "2026-11-04-taktak7633-10B", name: "taktak7633", amount: 10_000_000_000, asDebt: true },
+  { id: "2026-11-06-sousisan-10B", name: "総資産100億↑の男🤩", amount: 10_000_000_000, asDebt: true },
 ];
