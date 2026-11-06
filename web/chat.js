@@ -29,13 +29,17 @@ export function setupChat({ call, errMsg, esc, getMe, getPlayers }) {
   ticker.className = "cticker"; ticker.setAttribute("aria-hidden", "true");
   stage.appendChild(ticker);
 
+  const bb = (uid) => { const b = getPlayers()[uid]?.bubble; return b && /^[a-z]{1,16}$/.test(b) ? " bb-" + b : ""; };
+  // Redraw when someone changes their frame or bubble.
+  let looks = "";
+  const looksKey = () => [...new Set(msgs.map((m) => m.uid))].map((u) => { const q = getPlayers()[u] || {}; return u + (q.frame || "") + (q.bubble || ""); }).join();
   const lastId = () => (msgs.length ? msgs[msgs.length - 1].id : 0);
   const time = (at) => { const d = new Date(at); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
   function markSeen() { seen = lastId(); try { localStorage.setItem("chatSeen", String(seen)); } catch { /* ignore */ } }
 
   function drawLog() {
     const log = $("clog"), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-    log.innerHTML = msgs.length ? msgs.map((m) => `<div class="cm ${m.uid === getMe() ? "me" : ""}">${avatar(m, esc, getPlayers()[m.uid]?.frame)}<div class="cb"><div class="cn"><b>${esc(m.name)}</b><time>${time(m.at)}</time></div><div class="ct">${esc(m.text)}</div></div></div>`).join("")
+    log.innerHTML = msgs.length ? msgs.map((m) => `<div class="cm ${m.uid === getMe() ? "me" : ""}">${avatar(m, esc, getPlayers()[m.uid]?.frame)}<div class="cb"><div class="cn"><b>${esc(m.name)}</b><time>${time(m.at)}</time></div><div class="ct${bb(m.uid)}">${esc(m.text)}</div></div></div>`).join("")
       : `<div class="empty">まだ誰もしゃべってないよ</div>`;
     if (atBottom || log.dataset.first !== "1") { log.scrollTop = log.scrollHeight; log.dataset.first = "1"; }
   }
@@ -74,6 +78,9 @@ export function setupChat({ call, errMsg, esc, getMe, getPlayers }) {
 
   return {
     set(list) { msgs = Array.isArray(list) ? list : []; if (open) drawLog(); draw(); },
-    live(on) { if (live !== on) { live = on; draw(); if (on && open) { $("clog").dataset.first = ""; drawLog(); } } },
+    live(on) {
+      if (live !== on) { live = on; draw(); if (on && open) { $("clog").dataset.first = ""; drawLog(); } }
+      else if (open && live) { const k = looksKey(); if (k !== looks) { looks = k; drawLog(); } }
+    },
   };
 }

@@ -49,7 +49,8 @@ export class Core {
       case "bjAct": return this.bjAct(uid, m.action, m.round, m.turn, now);
       case "chat": return this.chat(uid, m.text, now);
       case "rename": return this.rename(uid, m.name, now);
-      case "setFrame": return this.setFrame(uid, m.frame);
+      case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
+      case "setBubble": return this.setLook(uid, "bubble", A.BUBBLES, m.bubble);
       default: fail("その操作はできないよ");
     }
   }
@@ -107,14 +108,14 @@ export class Core {
     this.mark("p:" + uid);
   }
 
-  /** Put on an avatar frame I've unlocked ("" takes it off). */
-  setFrame(uid, id) {
+  /** Put on an unlocked avatar frame or chat bubble ("" takes it off). field: "frame" | "bubble". */
+  setLook(uid, field, list, id) {
     const p = this.player(uid);
-    if (id === "" || id === null || id === undefined) { delete p.frame; this.mark("p:" + uid); return; }
-    const f = A.FRAMES.find((x) => x.id === id);
-    if (!f) fail("そのフレームはないよ");
+    if (id === "" || id === null || id === undefined) { delete p[field]; this.mark("p:" + uid); return; }
+    const f = list.find((x) => x.id === id);
+    if (!f) fail("それはないよ");
     if (!A.frameOk(p, f)) fail(`まだ使えないよ（${f.how}）`);
-    p.frame = id;
+    p[field] = id;
     this.mark("p:" + uid);
   }
 
@@ -440,6 +441,6 @@ export class Core {
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }

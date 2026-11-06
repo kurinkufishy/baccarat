@@ -92,3 +92,15 @@ export function frameOk(p, f) {
   if (f.req.ach) return got.includes(f.req.ach);
   return false;
 }
+
+// Chat bubble skins, unlocked the same way as frames.
+export const BUBBLES = [
+  { id: "mint", name: "ミント", req: { ach: "chat" }, how: "実績「おしゃべり」を解除" },
+  { id: "night", name: "夜空", req: { count: 3 }, how: "実績を3個解除" },
+  { id: "love", name: "ハート", req: { ach: "help" }, how: "実績「救世主」を解除" },
+  { id: "casino", name: "カジノ", req: { ach: "bac100" }, how: "実績「常連さん」を解除" },
+  { id: "gold", name: "ゴールド", req: { gold: 1 }, how: "ゴールド実績を1個解除" },
+  { id: "fire", name: "炎", req: { ach: "lose10" }, how: "実績「どん底」を解除" },
+  { id: "neon", name: "ネオン", req: { count: 10 }, how: "実績を10個解除" },
+  { id: "rainbow", name: "虹色", req: { count: 15 }, how: "実績を15個解除" },
+];

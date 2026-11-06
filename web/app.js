@@ -569,7 +569,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs); ach.reset(); players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset(); players = st.players || {}; betsMap = st.bacBets || {}; importAvail = !(st.meta && st.meta.imported);
   firstState = true; setTable(st.bac);
   gate = players[me] ? "in" : "join";
   render();

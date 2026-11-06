@@ -334,4 +334,8 @@ test("frames need their achievements", () => {
   nc(() => c.handle("a", "", "setFrame", { frame: "silver" }, 0), /8個/);
   c.handle("a", "", "setFrame", { frame: "" }, 0); assert.equal(c.d.players.a.frame, undefined);
   assert.ok(c.fullState().frameDefs.some((f) => f.id === "rainbow"));
+  c.handle("a", "", "setBubble", { bubble: "mint" }, 0); assert.equal(c.d.players.a.bubble, "mint");
+  nc(() => c.handle("a", "", "setBubble", { bubble: "rainbow" }, 0), /15個/);
+  nc(() => c.handle("a", "", "setBubble", { bubble: "diamond" }, 0), /ない/);
+  assert.ok(c.fullState().bubbleDefs.length >= 8);
 });

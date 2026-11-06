@@ -549,7 +549,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs); ach.reset(); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
+  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset(); players = st.players || {}; bets = st.bjBets || {}; importAvail = !(st.meta && st.meta.imported);
   Object.keys(els).forEach((k) => { els[k].remove(); delete els[k]; });
   firstState = true; setTable(st.bj);
   gate = players[me] ? "in" : "join";

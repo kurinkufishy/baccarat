@@ -4,7 +4,16 @@ import { avatar } from "./avatar.js";
 
 export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, busy }) {
   const $ = (id) => document.getElementById(id);
-  let defs = [], frames = [], known = null, knownFr = null, tab = "me", queue = [], showing = false, busyFr = false;
+  let defs = [], known = null, tab = "me", queue = [], showing = false, busyFr = false;
+  // Unlockable looks: avatar frames and chat bubbles. Same rules, different field on the player.
+  const LOOKS = {
+    frame: { field: "frame", action: "setFrame", label: "フレーム", list: [], seen: null,
+      intro: "実績を集めるとフレームが使えるようになるよ。つけたフレームはチャットやランキングでみんなに見える。",
+      preview: (p, id) => avatar(p, esc, id, "big") },
+    bubble: { field: "bubble", action: "setBubble", label: "吹き出し", list: [], seen: null,
+      intro: "チャットの吹き出しの見た目を変えられるよ。みんなの画面でもこの見た目になる。",
+      preview: (p, id) => `<span class="ct bprev${id ? " bb-" + id : ""}">よろしく！</span>` },
+  };
   const TIER = { 1: "ブロンズ", 2: "シルバー", 3: "ゴールド" };
 
   const btn = document.createElement("button");
@@ -16,7 +25,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
   ov.className = "overlay"; ov.id = "achm"; ov.hidden = true;
   ov.innerHTML = `<div class="modal achmodal" role="dialog" aria-modal="true" aria-labelledby="acht">
     <div class="mhead"><span id="acht">実績</span><button class="x" data-close aria-label="閉じる">×</button></div>
-    <div class="tabs" id="achtabs"><button data-t="me" class="on">自分</button><button data-t="frame">フレーム</button><button data-t="all">みんな</button></div>
+    <div class="tabs" id="achtabs"><button data-t="me" class="on">自分</button><button data-t="frame">フレーム</button><button data-t="bubble">吹き出し</button><button data-t="all">みんな</button></div>
     <div id="achbody"></div></div>`;
   document.body.appendChild(ov);
   const toast = document.createElement("div");
@@ -37,12 +46,12 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
           const on = !!got[a.id], hide = a.secret && !on;
           return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span><small>${TIER[a.tier]}${on ? "・" + date(got[a.id]) : ""}</small></div></div>`;
         }).join("")}</div>`;
-    } else if (tab === "frame") {
-      const p = getPlayers()[getMe()] || {}, cur = p.frame || "";
-      h = `<p class="small" style="margin:0">実績を集めるとフレームが使えるようになるよ。つけたフレームはチャットやランキングでみんなに見える。</p>
-        <div class="frgrid">${[{ id: "", name: "なし", how: "" }, ...frames].map((f) => {
+    } else if (LOOKS[tab]) {
+      const L = LOOKS[tab], p = getPlayers()[getMe()] || {}, cur = p[L.field] || "";
+      h = `<p class="small" style="margin:0">${L.intro}</p>
+        <div class="frgrid">${[{ id: "", name: tab === "bubble" ? "ふつう" : "なし", how: "" }, ...L.list].map((f) => {
           const ok = f.id === "" || frameOk(p, f), on = f.id === cur;
-          return `<button class="frc ${on ? "on" : ""}" data-f="${esc(f.id)}" ${!ok || on || busyFr ? "disabled" : ""}>${avatar(p, esc, f.id, "big")}<b>${esc(f.name)}</b><small>${on ? "つけてる" : ok ? "つける" : "🔒 " + esc(f.how)}</small></button>`;
+          return `<button class="frc ${on ? "on" : ""}" data-f="${esc(f.id)}" ${!ok || on || busyFr ? "disabled" : ""}>${L.preview(p, f.id)}<b>${esc(f.name)}</b><small>${on ? "つけてる" : ok ? "つける" : "🔒 " + esc(f.how)}</small></button>`;
         }).join("")}</div>`;
     } else {
       const ps = Object.entries(getPlayers()).map(([id, p]) => {
@@ -60,7 +69,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
     const a = queue.shift();
     showing = true;
     toast.className = `achtoast t${a.tier}`;
-    toast.innerHTML = `<span class="medal" aria-hidden="true">★</span><div><small>${a.frame ? "新しいフレーム" : "実績解除・" + TIER[a.tier]}</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div>`;
+    toast.innerHTML = `<span class="medal" aria-hidden="true">★</span><div><small>${a.look ? "新しい" + a.look : "実績解除・" + TIER[a.tier]}</small><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div>`;
     toast.hidden = false;
     setTimeout(() => { toast.hidden = true; showing = false; setTimeout(pump, 300); }, 3800);
   }
@@ -75,8 +84,9 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
   }
   $("achbody").addEventListener("click", async (e) => {
     const b = e.target.closest(".frc"); if (!b || b.disabled || busyFr) return;
+    const L = LOOKS[tab]; if (!L) return;
     busyFr = true; draw();
-    try { await call("setFrame", { frame: b.dataset.f }); flash(b.dataset.f ? `フレーム「${frames.find((f) => f.id === b.dataset.f)?.name}」をつけた` : "フレームを外した"); }
+    try { await call(L.action, { [L.field]: b.dataset.f }); flash(b.dataset.f ? `${L.label}「${L.list.find((f) => f.id === b.dataset.f)?.name}」にした` : `${L.label}を元に戻した`); }
     catch (er) { flash(errMsg(er)); }
     busyFr = false; draw();
   });
@@ -85,8 +95,8 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
   $("achtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.t; draw(); } });
 
   return {
-    setDefs(list, fr) { if (Array.isArray(list) && list.length) defs = list; if (Array.isArray(fr)) frames = fr; },
-    reset() { known = null; knownFr = null; },
+    setDefs(list, fr, bb) { if (Array.isArray(list) && list.length) defs = list; if (Array.isArray(fr)) LOOKS.frame.list = fr; if (Array.isArray(bb)) LOOKS.bubble.list = bb; },
+    reset() { known = null; LOOKS.frame.seen = null; LOOKS.bubble.seen = null; },
     /** Call after every state update. */
     update(live) {
       btn.hidden = !live || !defs.length;
@@ -103,10 +113,12 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
         const a = defs.find((x) => x.id === id);
         if (a) queue.push(a);
       }
-      // Tell me when a new frame becomes available.
-      const usable = frames.filter((f) => frameOk(p, f)).map((f) => f.id);
-      if (knownFr === null) knownFr = new Set(usable);
-      for (const id of usable) if (!knownFr.has(id)) { knownFr.add(id); const f = frames.find((x) => x.id === id); queue.push({ tier: 3, name: `フレーム「${f.name}」`, desc: "実績の画面の「フレーム」からつけられるよ", frame: true }); }
+      // Tell me when a new frame or bubble becomes available.
+      for (const L of Object.values(LOOKS)) {
+        const usable = L.list.filter((f) => frameOk(p, f)).map((f) => f.id);
+        if (L.seen === null) { L.seen = new Set(usable); continue; }
+        for (const id of usable) if (!L.seen.has(id)) { L.seen.add(id); const f = L.list.find((x) => x.id === id); queue.push({ tier: 3, name: `${L.label}「${f.name}」`, desc: `実績の画面の「${L.label}」から使えるよ`, look: L.label }); }
+      }
       pump();
       draw();
     },
