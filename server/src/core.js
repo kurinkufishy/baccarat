@@ -90,7 +90,7 @@ export class Core {
     if (amount > debt) fail(`借金（${debt.toLocaleString("ja-JP")}）より多くは返せないよ`);
     if (amount > p.chips) fail("チップが足りない");
     p.chips -= amount; q.dep = debt - amount;
-    if (to !== uid) { q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5); A.unlock(p, "help", now); }
+    if (to !== uid) { q.helps = [{ from: uid, amount, at: now }, ...(q.helps || [])].slice(0, 5); A.unlock(p, "help", now); if (amount >= 1e8) A.unlock(p, "helpbig", now); }
     else if (q.dep === 0) A.unlock(p, "clean", now);
     this.mark("p:" + uid, "p:" + to);
   }
@@ -116,6 +116,7 @@ export class Core {
     if (!f) fail("それはないよ");
     if (!A.frameOk(p, f)) fail(`まだ使えないよ（${f.how}）`);
     p[field] = id;
+    A.unlock(p, "dressup", Date.now());
     this.mark("p:" + uid);
   }
 
@@ -130,6 +131,7 @@ export class Core {
     p.chips -= amount; add(q, amount);
     q.gifts = [{ from: uid, amount, at: now }, ...(q.gifts || [])].slice(0, 5);
     A.unlock(p, "give", now);
+    if (amount >= 1e8) A.unlock(p, "givebig", now);
     this.mark("p:" + uid, "p:" + to);
   }
 
@@ -146,7 +148,10 @@ export class Core {
     const last = this.d.chat[this.d.chat.length - 1];
     this.d.chat.push({ id: (last ? last.id : 0) + 1, uid, name: p.name, color: p.color, text, at: now });
     if (this.d.chat.length > CHAT_KEEP) this.d.chat = this.d.chat.slice(-CHAT_KEEP);
-    if (A.unlock(p, "chat", now)) this.mark("p:" + uid);
+    p.ax = p.ax || {}; p.ax.chat = (p.ax.chat || 0) + 1;
+    A.unlock(p, "chat", now);
+    if (p.ax.chat >= 100) A.unlock(p, "chat100", now);
+    this.mark("p:" + uid);
     this.mark("chat");
   }
 
@@ -195,7 +200,16 @@ export class Core {
         A.checkResult(p, d, p.chips === 0, now);
         if (r.pp && b.ppair > 0 || r.bp && b.bpair > 0) A.unlock(p, "pair", now);
         if (r.pp && r.bp && b.ppair > 0 && b.bpair > 0) A.unlock(p, "dpair", now);
-        if (r.w === "T" && b.tie > 0) A.unlock(p, "tie", now);
+        p.ax = p.ax || {};
+        if (r.pp && b.ppair > 0 || r.bp && b.bpair > 0) { p.ax.pair = (p.ax.pair || 0) + 1; if (p.ax.pair >= 10) A.unlock(p, "pair10", now); }
+        if (r.w === "T" && b.tie > 0) {
+          A.unlock(p, "tie", now);
+          p.ax.tie = (p.ax.tie || 0) + 1; if (p.ax.tie >= 5) A.unlock(p, "tie5", now);
+          if (p.ax.tieRound === t.round - 1) A.unlock(p, "tie2", now);
+          p.ax.tieRound = t.round;
+          if (b.tie >= 1e8) A.unlock(p, "bigtie", now);
+        }
+        if (d > 0 && t.round % 1000 === 777) A.unlock(p, "lucky777", now);
         const winCards = r.w === "P" ? coup.P : r.w === "B" ? coup.B : null, winBet = r.w === "P" ? b.player : r.w === "B" ? b.banker : 0;
         if (winCards && winCards.length === 2 && G.tot(winCards) === 9 && winBet > 0) A.unlock(p, "nat", now);
         const sk = A.streak(p, "b", d);
@@ -260,6 +274,7 @@ export class Core {
     const start = Math.max(now, t.animUntil || 0);
     Object.assign(t, { dealer: cards, holeHidden: false, animUntil: start + BJ.CARD_MS * (cards.length - 1) + 400, phase: "result", turn: -1, turnEndsAt: 0, seq: t.seq + 1 });
     s.hole = null;
+    const dt = B.total(cards).total;
     for (const h of t.hands) {
       const { ret, out } = B.settle(h, cards);
       h.out = out; h.d = ret - h.bet;
@@ -271,7 +286,15 @@ export class Core {
       if (h.status === "bj") A.unlock(p, "bjbj", now);
       if (h.doubled && h.d > 0) A.unlock(p, "bjdbl", now);
       if (h.cards.length >= 5 && B.total(h.cards).total === 21) A.unlock(p, "bj5", now);
-      if (A.streak(p, "j", h.d) >= 5) A.unlock(p, "bjstreak5", now);
+      const js = A.streak(p, "j", h.d);
+      if (js >= 5) A.unlock(p, "bjstreak5", now);
+      if (js >= 10) A.unlock(p, "bjstreak10", now);
+      const pt = B.total(h.cards).total, dbj = B.isBlackjack(cards);
+      if (h.cards.length >= 3 && pt === 21) A.unlock(p, "bj21", now);
+      if (dt > 21 && h.d > 0) A.unlock(p, "dbust", now);
+      if (h.status === "bj" && dbj) A.unlock(p, "bjpush", now);
+      if (h.doubled && h.d < 0) A.unlock(p, "dblfail", now);
+      if (h.status === "bust") { p.ax.bust = (p.ax.bust || 0) + 1; if (p.ax.bust >= 20) A.unlock(p, "bust20", now); }
       Object.assign(p, {
         chips: Math.min(p.chips + ret, G.MAX_CHIPS), bjLast: { round: t.round, d: h.d, ret, bet: h.bet }, bjst: st,
         bjhist: [{ r: t.round, bet: h.bet, d: h.d, out }, ...(p.bjhist || [])].slice(0, 12),
@@ -279,7 +302,6 @@ export class Core {
       });
       this.mark("p:" + h.uid);
     }
-    const dt = B.total(cards).total;
     t.history = [...(t.history || []), { r: t.round, d: dt > 21 ? "BUST" : B.isBlackjack(cards) ? "BJ" : dt }].slice(-30);
   }
   bjNext(now) {

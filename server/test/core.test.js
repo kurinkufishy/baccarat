@@ -339,3 +339,25 @@ test("frames need their achievements", () => {
   nc(() => c.handle("a", "", "setBubble", { bubble: "diamond" }, 0), /ない/);
   assert.ok(c.fullState().bubbleDefs.length >= 8);
 });
+
+test("more achievements: tie streak, counters, time of day, dressup", () => {
+  const c = new Core(freshData());
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  const a = () => c.d.players.a;
+  let now = Date.UTC(2026, 10, 6, 16, 0); // 01:00 in Japan
+  const tieCoup = () => { c.d.bacShoe = "2S".repeat(60) + ["7S", "7D", "7H", "7C"].reverse().join(""); };
+  for (let i = 0; i < 2; i++) {
+    tieCoup();
+    c.handle("a", "", "setBets", { bets: { tie: 1000 }, round: c.d.bac.round }, now);
+    c.step(now + G.BET_MS + 1); now += G.BET_MS + 1;
+    c.step(now + 60_000); now += 60_000;
+  }
+  assert.ok(a().ach.tie2, "two ties in a row");
+  assert.ok(a().ach.night, "played at 1am JST");
+  assert.equal(a().ax.tie, 2);
+  a().ach.chat = 1;
+  for (let i = 0; i < 100; i++) c.handle("a", "", "chat", { text: "x" }, now + i * 1000);
+  assert.ok(a().ach.chat100);
+  c.handle("a", "", "setBubble", { bubble: "mint" }, now);
+  assert.ok(a().ach.dressup);
+});
