@@ -4,7 +4,7 @@ import { avatar } from "./avatar.js";
 
 export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, busy }) {
   const $ = (id) => document.getElementById(id);
-  let defs = [], known = null, tab = "me", queue = [], showing = false, busyFr = false;
+  let defs = [], known = null, tab = "me", tierF = 0, queue = [], showing = false, busyFr = false;
   // Unlockable looks: avatar frames and chat bubbles. Same rules, different field on the player.
   const LOOKS = {
     frame: { field: "frame", action: "setFrame", label: "フレーム", list: [], seen: null,
@@ -41,11 +41,20 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
     let h;
     if (tab === "me") {
       const got = mine(), n = defs.filter((a) => got[a.id]).length;
+      const card = (a) => {
+        const on = !!got[a.id], hide = a.secret && !on;
+        return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span>${on ? `<small>${date(got[a.id])} 解除</small>` : ""}</div></div>`;
+      };
+      const count = (t) => { const l = defs.filter((a) => a.tier === t); return [l.filter((a) => got[a.id]).length, l.length]; };
+      const pills = [[0, "すべて", [n, defs.length]], [1, "ブロンズ", count(1)], [2, "シルバー", count(2)], [3, "ゴールド", count(3)]];
+      const section = (t) => {
+        const [g, all] = count(t);
+        const list = defs.filter((a) => a.tier === t).sort((x, y) => (got[y.id] ? 1 : 0) - (got[x.id] ? 1 : 0));
+        return `<section class="achsec t${t}"><h3><span class="medal sm" aria-hidden="true">★</span>${TIER[t]}<span class="num">${g} / ${all}</span></h3><div class="achgrid">${list.map(card).join("")}</div></section>`;
+      };
       h = `<div class="achsum"><div><b class="num">${n}</b> / ${defs.length} 解除</div><div class="achbar"><i style="width:${defs.length ? (n / defs.length) * 100 : 0}%"></i></div></div>
-        <div class="achgrid">${defs.map((a) => {
-          const on = !!got[a.id], hide = a.secret && !on;
-          return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span><small>${TIER[a.tier]}${on ? "・" + date(got[a.id]) : ""}</small></div></div>`;
-        }).join("")}</div>`;
+        <div class="achpills" role="tablist">${pills.map(([t, l, [g, all]]) => `<button class="achpill ${t ? "t" + t : ""} ${t === tierF ? "on" : ""}" data-tier="${t}" role="tab" aria-selected="${t === tierF}">${l}<span class="num">${g}/${all}</span></button>`).join("")}</div>
+        ${(tierF ? [tierF] : [1, 2, 3]).map(section).join("")}`;
     } else if (LOOKS[tab]) {
       const L = LOOKS[tab], p = getPlayers()[getMe()] || {}, cur = p[L.field] || "";
       h = `<p class="small" style="margin:0">${L.intro}</p>
@@ -83,6 +92,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
     return false;
   }
   $("achbody").addEventListener("click", async (e) => {
+    const pill = e.target.closest(".achpill"); if (pill) { tierF = +pill.dataset.tier; draw(); return; }
     const b = e.target.closest(".frc"); if (!b || b.disabled || busyFr) return;
     const L = LOOKS[tab]; if (!L) return;
     busyFr = true; draw();
@@ -90,7 +100,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
     catch (er) { flash(errMsg(er)); }
     busyFr = false; draw();
   });
-  btn.addEventListener("click", () => { ov.hidden = false; tab = "me"; draw(); });
+  btn.addEventListener("click", () => { ov.hidden = false; tab = "me"; tierF = 0; draw(); });
   ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("[data-close]")) ov.hidden = true; });
   $("achtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { tab = b.dataset.t; draw(); } });
 

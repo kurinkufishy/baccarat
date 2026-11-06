@@ -357,3 +357,16 @@ a.ib{text-decoration:none}
 .ct.bb-ice{background:linear-gradient(135deg,#eaf9ff,#b9e8ff 60%,#dff5ff);border:1px solid #fff;color:#0d3550;box-shadow:0 0 8px rgba(185,232,255,.5)}
 .ct.bb-galaxy{background:linear-gradient(90deg,#2b0f5c,#5b21b6,#a3127a,#1a4fb8,#2b0f5c,#5b21b6,#a3127a,#1a4fb8,#2b0f5c);background-size:200% 100%;background-position:var(--frp) 50%;color:#fff;animation:frmove 4s linear infinite}
 .clog{padding-top:8px}
+
+/* ---------- achievement tiers ---------- */
+.achpills{display:flex;gap:6px;flex-wrap:wrap}
+.achpill{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;display:flex;gap:6px;align-items:center}
+.achpill .num{font-size:11px;opacity:.8}
+.achpill.on{color:var(--text);border-color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,var(--panel2))}
+.achpill.t3.on{border-color:#e8c25a}.achpill.t2.on{border-color:#c9d1d9}.achpill.t1.on{border-color:#d08a5c}
+.achsec{display:flex;flex-direction:column;gap:8px}
+.achsec h3{margin:6px 0 0;font-size:14px;display:flex;align-items:center;gap:8px}
+.achsec h3 .num{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600}
+.achsec.t3 h3{color:#ffd76a}.achsec.t2 h3{color:#dfe6ee}.achsec.t1 h3{color:#e9a77b}
+.medal.sm{width:20px;height:20px;font-size:11px;background:radial-gradient(circle at 35% 30%,var(--m1),var(--m2));color:rgba(40,24,4,.75)}
+.achsec.t1 .medal.sm{--m1:#e0a37a;--m2:#9a5b34}.achsec.t2 .medal.sm{--m1:#eef2f6;--m2:#8c96a1}.achsec.t3 .medal.sm{--m1:#ffe08a;--m2:#c08a1f}
