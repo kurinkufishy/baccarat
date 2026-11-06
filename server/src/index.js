@@ -24,7 +24,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === "/health") return new Response("ok");
-    if (url.pathname === "/grants") return env.CASINO.get(env.CASINO.idFromName("main")).fetch(req);
+    if (url.pathname === "/grants" || url.pathname === "/status") return env.CASINO.get(env.CASINO.idFromName("main")).fetch(req);
     if (url.pathname !== "/ws") return new Response("not found", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     if (!originOk(req, env)) return new Response("forbidden origin", { status: 403 });
@@ -95,10 +95,11 @@ export class Casino extends DurableObject {
 
   async fetch(req) {
     await this.ready;
-    if (new URL(req.url).pathname === "/grants") {
+    const path = new URL(req.url).pathname;
+    if (path === "/grants" || path === "/status") {
       this.core.applyGrants(GRANTS, Date.now());
       if (this.core.changed.size) await this.commit();
-      return Response.json(this.core.d.meta.grants || {});
+      return Response.json(path === "/grants" ? this.core.d.meta.grants || {} : { grants: this.core.d.meta.grants || {}, defined: GRANTS.map((g) => g.id), race: !!(this.core.d.rc && this.core.d.rc.card), at: Date.now() });
     }
     const socks = this.ctx.getWebSockets();
     if (socks.length >= MAX_SOCKETS) return new Response("table is full", { status: 503 });
