@@ -95,7 +95,11 @@ export class Casino extends DurableObject {
 
   async fetch(req) {
     await this.ready;
-    if (new URL(req.url).pathname === "/grants") return Response.json(this.core.d.meta.grants || {});
+    if (new URL(req.url).pathname === "/grants") {
+      this.core.applyGrants(GRANTS, Date.now());
+      if (this.core.changed.size) await this.commit();
+      return Response.json(this.core.d.meta.grants || {});
+    }
     const socks = this.ctx.getWebSockets();
     if (socks.length >= MAX_SOCKETS) return new Response("table is full", { status: 503 });
     const pair = new WebSocketPair();
@@ -161,6 +165,7 @@ export class Casino extends DurableObject {
 
     if (!ACTIONS.has(m.type)) { reply(false, { error: "その操作はできないよ" }); return; }
     const now = Date.now();
+    this.core.applyGrants(GRANTS, now); // catches a grant whose player joined after startup
     this.core.step(now); // settle anything already due before acting on it
     await this.commit();
     try {
