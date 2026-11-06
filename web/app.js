@@ -7,6 +7,7 @@ import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
+import { setupGames } from "./games.js";
 
 /* ================= constants (keep in sync with functions/game.js) ================= */
 const START = 10000, BET_MS = 15000, HOLD_MS = 4500, MAX_DEPOSIT = 10000000;
@@ -457,6 +458,7 @@ function render() {
 }
 
 /* ================= wallet ================= */
+setupGames("bac");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => !!animating });

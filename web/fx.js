@@ -7,6 +7,7 @@ import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
+import { setupGames } from "./games.js";
 
 /* ================= constants (keep in sync with server/src/fxgame.js) ================= */
 const SPREAD = 0.006, LEVS = [1, 5, 10, 25, 50, 100], MAX_POS = 5, MIN_MARGIN = 100, KEEP_TICKS = 300, KEEP_CANDLES = 180;
@@ -202,6 +203,7 @@ $("mid").addEventListener("click", (e) => {
 });
 
 /* ================= shared modules ================= */
+setupGames("fx");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => false });

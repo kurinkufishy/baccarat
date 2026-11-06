@@ -7,6 +7,7 @@ import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
+import { setupGames } from "./games.js";
 
 /* ================= constants (keep in sync with functions/bjgame.js) ================= */
 const START = 10000, BET_MS = 15000, TURN_MS = 15000, CARD_MS = 600, GRACE_MS = 1000, HOLD_MS = 5000;
@@ -443,6 +444,7 @@ function render() {
 }
 
 /* ================= wallet ================= */
+setupGames("bj");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => animating > 0 || (t.phase === "result" && sNow() < (t.animUntil || 0)) });
