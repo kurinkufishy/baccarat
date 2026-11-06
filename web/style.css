@@ -387,3 +387,29 @@ a.gcard:hover,a.gcard:focus-visible{border-color:var(--gold);background:color-mi
 .gcard em{position:absolute;top:6px;right:8px;font-style:normal;font-size:10px;font-weight:800;color:#1b1406;background:var(--gold);border-radius:999px;padding:1px 7px}
 @media (prefers-reduced-motion:reduce){.gamesp{animation:none}}
 .gamesp{max-height:calc(100dvh - 90px);overflow:auto}
+
+/* ---------- achievement progress ---------- */
+.aprog{height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:5px}
+.aprog i{display:block;height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:2px}
+.achc .aprog + small{color:var(--text);opacity:.8}
+.achc:has(.aprog){opacity:.8}
+
+/* ---------- FX & racing frames ---------- */
+.fr-bull{--ring:linear-gradient(0deg,#0b6b33,#22d36b 45%,#b6ffd2 50%,#22d36b 55%,#0b6b33);--rs:100% 220%;box-shadow:0 0 7px rgba(34,211,107,.6);animation:frmove 1.2s linear infinite}
+.dot.fr-bull{background-position:0 0,50% calc(100% - var(--frp))}.acct img.fr-bull{background-position:50% calc(100% - var(--frp))}
+.fr-bear{--ring:linear-gradient(0deg,#6b0b14,#ff5c6c 45%,#ffc2c8 50%,#ff5c6c 55%,#6b0b14);--rs:100% 220%;box-shadow:0 0 7px rgba(255,92,108,.6);animation:frmove 1.2s linear infinite}
+.dot.fr-bear{background-position:0 0,50% var(--frp)}.acct img.fr-bear{background-position:50% var(--frp)}
+.fr-candle{--ring:repeating-conic-gradient(#22d36b 0 30deg,#ff5c6c 30deg 60deg);box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.fr-turf{--ring:repeating-linear-gradient(90deg,#2f8f3f 0 4px,#45b356 4px 8px);box-shadow:0 0 0 1.5px #fff}
+.fr-jockey{--ring:repeating-linear-gradient(45deg,#d7263d 0 4px,#f2c14e 4px 8px,#2a62d6 8px 12px);box-shadow:0 0 5px rgba(242,193,78,.5)}
+.fr-horseshoe{--ring:linear-gradient(135deg,#f4f6f8,#8e98a3 40%,#dfe5ea 55%,#6f7984);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 0 8px rgba(255,215,106,.55)}
+.dot.fr-horseshoe{position:relative;overflow:visible}
+.dot.fr-horseshoe::after{content:"";position:absolute;left:50%;top:-3px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#ffd76a;box-shadow:0 0 6px #ffd76a}
+
+/* ---------- FX & racing chat bubbles ---------- */
+.ct.bb-ticker{background:#0a0a0a;border:1px solid #3a2a00;color:#ffb000;font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;text-shadow:0 0 5px rgba(255,176,0,.55);letter-spacing:.02em}
+.ct.bb-ticker::before{content:"▲ ";color:#22d36b;text-shadow:none}
+.ct.bb-bullmarket{background:linear-gradient(135deg,#0d4d2a,#14874a 55%,#22d36b);color:#eafff1;box-shadow:0 0 10px rgba(34,211,107,.35)}
+.ct.bb-bullmarket::after{content:" 📈"}
+.ct.bb-turf{background:repeating-linear-gradient(90deg,#2f8f3f 0 14px,#38a24a 14px 28px);border-top:3px solid #fff;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+.ct.bb-jockey{background:repeating-linear-gradient(135deg,#d7263d 0 10px,#b81f33 10px 20px);border:2px solid #f2c14e;color:#fff;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.4)}

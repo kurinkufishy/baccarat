@@ -33,6 +33,21 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
   document.body.appendChild(toast);
 
   const mine = () => (getPlayers()[getMe()] || {}).ach || {};
+  const short = (n) => n >= 1e12 ? (+(n / 1e12).toFixed(1)) + "兆" : n >= 1e8 ? (+(n / 1e8).toFixed(1)) + "億" : n >= 1e4 ? (+(n / 1e4).toFixed(1)) + "万" : String(Math.floor(n));
+  /** How far a player is toward an achievement's goal (see PROG on the server). */
+  function progVal(p, k) {
+    const neg = k[0] === "-", key = neg ? k.slice(1) : k;
+    let v;
+    if (key === "wag") v = ["st", "bjst", "fxst", "rcst"].reduce((s, f) => s + ((p[f] && p[f].wag) || 0), 0);
+    else if (key === "achn") v = Object.keys(p.ach || {}).filter((id) => id !== "collector" && defs.some((a) => a.id === id)).length;
+    else v = key.split(".").reduce((o, f) => (o && typeof o === "object" ? o[f] : undefined), p) || 0;
+    return Math.max(0, neg ? -v : v);
+  }
+  function progHtml(p, a) {
+    if (!a.prog) return "";
+    const v = Math.min(progVal(p, a.prog.k), a.prog.goal), pct = (v / a.prog.goal) * 100;
+    return `<div class="aprog"><i style="width:${pct}%"></i></div><small class="num">${a.prog.k.includes(".b") || a.prog.k.includes(".j") ? "いま " : ""}${short(v)} / ${short(a.prog.goal)}</small>`;
+  }
   const date = (at) => { const d = new Date(at); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
   function draw() {
@@ -43,7 +58,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
       const got = mine(), n = defs.filter((a) => got[a.id]).length;
       const card = (a) => {
         const on = !!got[a.id], hide = a.secret && !on;
-        return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span>${on ? `<small>${date(got[a.id])} 解除</small>` : ""}</div></div>`;
+        return `<div class="achc t${a.tier} ${on ? "on" : ""}"><span class="medal" aria-hidden="true">${on ? "★" : "?"}</span><div><b>${hide ? "？？？" : esc(a.name)}</b><span>${hide ? "ひみつの実績" : esc(a.desc)}</span>${on ? `<small>${date(got[a.id])} 解除</small>` : progHtml(getPlayers()[getMe()] || {}, a)}</div></div>`;
       };
       const count = (t) => { const l = defs.filter((a) => a.tier === t); return [l.filter((a) => got[a.id]).length, l.length]; };
       const pills = [[0, "すべて", [n, defs.length]], [1, "ブロンズ", count(1)], [2, "シルバー", count(2)], [3, "ゴールド", count(3)]];
@@ -60,7 +75,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
       h = `<p class="small" style="margin:0">${L.intro}</p>
         <div class="frgrid">${[{ id: "", name: tab === "bubble" ? "ふつう" : "なし", how: "" }, ...L.list].map((f) => {
           const ok = f.id === "" || frameOk(p, f), on = f.id === cur;
-          return `<button class="frc ${on ? "on" : ""}" data-f="${esc(f.id)}" ${!ok || on || busyFr ? "disabled" : ""}>${L.preview(p, f.id)}<b>${esc(f.name)}</b><small>${on ? "つけてる" : ok ? "つける" : "🔒 " + esc(f.how)}</small></button>`;
+          return `<button class="frc ${on ? "on" : ""}" data-f="${esc(f.id)}" ${!ok || on || busyFr ? "disabled" : ""}>${L.preview(p, f.id)}<b>${esc(f.name)}</b><small>${on ? "つけてる" : ok ? "つける" : "🔒 " + esc(f.how) + reqProg(p, f)}</small></button>`;
         }).join("")}</div>`;
     } else {
       const ps = Object.entries(getPlayers()).map(([id, p]) => {
@@ -83,6 +98,14 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
     setTimeout(() => { toast.hidden = true; showing = false; setTimeout(pump, 300); }, 3800);
   }
 
+  function reqProg(p, f) {
+    const got = Object.keys(p.ach || {}).filter((id) => tierOf(id));
+    if (f.req.count) return `（${Math.min(got.length, f.req.count)}/${f.req.count}）`;
+    if (f.req.gold) return `（${Math.min(got.filter((id) => tierOf(id) === 3).length, f.req.gold)}/${f.req.gold}）`;
+    const a = f.req.ach && defs.find((x) => x.id === f.req.ach);
+    if (a && a.prog) return `（${short(Math.min(progVal(p, a.prog.k), a.prog.goal))}/${short(a.prog.goal)}）`;
+    return "";
+  }
   const tierOf = (id) => (defs.find((a) => a.id === id) || {}).tier;
   function frameOk(p, f) {
     const got = Object.keys(p.ach || {}).filter((id) => tierOf(id));

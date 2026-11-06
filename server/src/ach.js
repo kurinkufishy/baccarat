@@ -69,6 +69,16 @@ export const ACH = [
   { id: "collector", tier: 3, name: "コレクター", desc: "実績を30個解除する" },
   { id: "rename", tier: 1, name: "改名", desc: "名前を変える" },
 ];
+// Progress shown on locked achievements: [what to count, goal]. The client reads these numbers off the player.
+// "st.n" = a field path, "-ax.b" = negated (losing streak), "wag" = all chips ever bet, "achn" = achievements unlocked.
+const PROG = {
+  bac100: ["st.n", 100], bac1000: ["st.n", 1000], bj100: ["bjst.n", 100], bj500: ["bjst.n", 500],
+  fx100: ["fxst.n", 100], rc100: ["rcst.n", 100], pair10: ["ax.pair", 10], tie5: ["ax.tie", 5], bust20: ["ax.bust", 20],
+  chat100: ["ax.chat", 100], fxshort: ["ax.fxs", 10], streak5: ["ax.b", 5], streak10: ["ax.b", 10], lose10: ["-ax.b", 10],
+  bjstreak5: ["ax.j", 5], bjstreak10: ["ax.j", 10], rich1b: ["chips", 1e9], rich10b: ["chips", 1e10], rich1t: ["chips", 1e12],
+  debt1b: ["dep", 1e9], debt100b: ["dep", 1e11], wager1b: ["wag", 1e9], wager1t: ["wag", 1e12], collector: ["achn", 30],
+};
+for (const a of ACH) if (PROG[a.id]) a.prog = { k: PROG[a.id][0], goal: PROG[a.id][1] };
 const IDS = new Set(ACH.map((a) => a.id));
 
 /** Unlock one achievement. Returns true if it was new. */
@@ -138,6 +148,12 @@ export const FRAMES = [
   { id: "galaxy", name: "銀河", req: { count: 25 }, how: "実績を25個解除" },
   { id: "hologram", name: "ホログラム", req: { ach: "wager1t" }, how: "実績「ハイローラー」を解除" },
   { id: "crown", name: "王冠", req: { count: 35 }, how: "実績を35個解除" },
+  { id: "bull", name: "ブル", req: { ach: "fxlev" }, how: "実績「ハイレバ」を解除" },
+  { id: "bear", name: "ベア", req: { ach: "fxshort" }, how: "実績「空売りの達人」を解除" },
+  { id: "candle", name: "ローソク足", req: { ach: "fx100" }, how: "実績「トレーダー」を解除" },
+  { id: "turf", name: "ターフ", req: { ach: "rc1" }, how: "実績「はじめての馬券」を解除" },
+  { id: "jockey", name: "勝負服", req: { ach: "rcfav" }, how: "実績「鉄板」を解除" },
+  { id: "horseshoe", name: "蹄鉄", req: { ach: "rclong" }, how: "実績「大穴」を解除" },
 ];
 const TIER_OF = Object.fromEntries(ACH.map((a) => [a.id, a.tier]));
 export function frameOk(p, f) {
@@ -161,4 +177,8 @@ export const BUBBLES = [
   { id: "hacker", name: "ハッカー", req: { ach: "chat100" }, how: "実績「おしゃべり大王」を解除" },
   { id: "ice", name: "氷", req: { ach: "bjstreak10" }, how: "実績「ディーラー殺し」を解除" },
   { id: "galaxy", name: "銀河", req: { count: 25 }, how: "実績を25個解除" },
+  { id: "ticker", name: "株価ボード", req: { ach: "fx1" }, how: "実績「はじめてのFX」を解除" },
+  { id: "bullmarket", name: "爆上げ", req: { ach: "fx10x" }, how: "実績「テンバガー」を解除" },
+  { id: "turf", name: "ターフ", req: { ach: "rc1" }, how: "実績「はじめての馬券」を解除" },
+  { id: "jockey", name: "勝負服", req: { ach: "rc100" }, how: "実績「競馬通」を解除" },
 ];
