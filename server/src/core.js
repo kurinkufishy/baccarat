@@ -443,14 +443,19 @@ export class Core {
     let changed = false;
     for (const g of list) {
       if (done[g.id] && done[g.id].startsWith("ok")) continue;
-      const setTo = g.setChips;
-      if (setTo !== undefined ? !isInt(setTo) || setTo < 0 || setTo > G.MAX_CHIPS : !isInt(g.amount) || g.amount < 1) { done[g.id] = "bad-amount"; changed = true; continue; }
+      const setTo = g.setChips, setNet = g.setNet;
+      if (setNet !== undefined ? !isInt(setNet) : setTo !== undefined ? !isInt(setTo) || setTo < 0 || setTo > G.MAX_CHIPS : !isInt(g.amount) || g.amount < 1) { done[g.id] = "bad-amount"; changed = true; continue; }
       let hits = Object.entries(this.d.players).filter(([, p]) => p.name === g.name);
       if (!hits.length) hits = Object.entries(this.d.players).filter(([, p]) => String(p.name).toLowerCase() === String(g.name).toLowerCase());
       if (hits.length !== 1) { const why = hits.length ? "ambiguous" : "not-found"; if (done[g.id] !== why) { done[g.id] = why; changed = true; } continue; }
       const [uid, p] = hits[0];
-      if (setTo !== undefined) p.chips = setTo; // set the balance to an exact number (debt untouched)
+      if (setNet !== undefined) {
+        // Make the ranking's 収支 (chips - debt - starting chips) exactly setNet; add debt if chips alone can't get there.
+        const chips = setNet + G.START + (p.dep || 0);
+        if (chips >= 0) p.chips = Math.min(chips, G.MAX_CHIPS); else { p.chips = 0; p.dep = (p.dep || 0) - chips; }
+      } else if (setTo !== undefined) p.chips = setTo; // set the balance to an exact number (debt untouched)
       else { add(p, g.amount); if (g.asDebt) p.dep = (p.dep || 0) + g.amount; }
+      if (typeof g.note === "string") { if (g.note) p.note = g.note.slice(0, 30); else delete p.note; }
       done[g.id] = "ok:" + now;
       this.mark("p:" + uid);
       changed = true;

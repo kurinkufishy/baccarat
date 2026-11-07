@@ -450,3 +450,16 @@ test("owner grant can set an exact balance", () => {
   assert.equal(c.d.players.u1.chips, 1_919_114_514_810); assert.equal(c.d.players.u1.dep, 5);
   assert.equal(r.s1, "ok:9"); assert.equal(r.s2, "bad-amount");
 });
+
+test("owner grant can set the ranking net exactly, with a note", () => {
+  const c = new Core(freshData());
+  c.handle("u1", "", "join", { name: "taktak7633" }, 0);
+  const p = c.d.players.u1;
+  p.chips = 1_919_114_514_810; p.dep = 10_000_000_000;
+  c.applyGrants([{ id: "n1", name: "Taktak7633", setNet: -10_000_000_000, note: "金なさすぎて売ったパソコン" }], 1);
+  assert.equal(p.chips - (p.dep || 0) - G.START, -10_000_000_000);
+  assert.equal(p.note, "金なさすぎて売ったパソコン");
+  p.dep = 0; // not enough debt to get that low: debt goes up instead
+  c.applyGrants([{ id: "n2", name: "taktak7633", setNet: -10_000_000_000 }], 2);
+  assert.equal(p.chips, 0); assert.equal(p.chips - p.dep - G.START, -10_000_000_000);
+});

@@ -394,7 +394,7 @@ function renderSide(list) {
     h = rows.length ? rows.join("") : '<div class="empty">まだ誰も賭けていません</div>';
   } else {
     const rk = Object.keys(players).map(view).map((p) => ({ p, net: netOf(p) })).sort((a, b) => b.net - a.net).slice(0, 30);
-    h = rk.length ? rk.map(({ p, net }, i) => `<div class="row">${dot(p)}${nm(p)}<span class="v num ${net > 0 ? "pos" : "neg"}">${i + 1}位 ${net >= 0 ? "+" : ""}${fmt(net)}</span></div>`).join("") : '<div class="empty">まだ誰もいません</div>';
+    h = rk.length ? rk.map(({ p, net }, i) => `<div class="row">${dot(p)}${p.note ? `<span class="n">${esc(p.name)}${p.id === me ? '<span class="you">あなた</span>' : ""}<small class="rnote">💻 ${esc(p.note)}</small></span>` : nm(p)}<span class="v num ${net > 0 ? "pos" : "neg"}">${i + 1}位 ${net >= 0 ? "+" : ""}${fmt(net)}</span></div>`).join("") : '<div class="empty">まだ誰もいません</div>';
   }
   $("sidebody").innerHTML = h;
   $("sidefoot").innerHTML = "";

@@ -413,3 +413,4 @@ a.gcard:hover,a.gcard:focus-visible{border-color:var(--gold);background:color-mi
 .ct.bb-bullmarket::after{content:" 📈"}
 .ct.bb-turf{background:repeating-linear-gradient(90deg,#2f8f3f 0 14px,#38a24a 14px 28px);border-top:3px solid #fff;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)}
 .ct.bb-jockey{background:repeating-linear-gradient(135deg,#d7263d 0 10px,#b81f33 10px 20px);border:2px solid #f2c14e;color:#fff;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.row .n .rnote{display:block;font-size:10px;font-weight:600;color:#ff9aa2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
