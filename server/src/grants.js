@@ -5,4 +5,5 @@
 export const GRANTS = [
   { id: "2026-11-04-taktak7633-10B", name: "taktak7633", amount: 10_000_000_000, asDebt: true },
   { id: "2026-11-06-sousisan-10B", name: "総資産100億↑の漢🤩", amount: 100_000_000_000, asDebt: true },
+  { id: "2026-11-07-sousisan-100B", name: "総資産100億↑の漢🤩", amount: 100_000_000_000, asDebt: true },
 ];
