@@ -8,4 +8,5 @@ export const GRANTS = [
   { id: "2026-11-06-sousisan-10B", name: "総資産100億↑の漢🤩", amount: 100_000_000_000, asDebt: true },
   { id: "2026-11-07-sousisan-100B", name: "総資産100億↑の漢🤩", amount: 100_000_000_000, asDebt: true },
   { id: "2026-11-07-taktak7633-set", name: "taktak7633", setChips: 1_919_114_514_810 },
+  { id: "2026-11-07-kitamura-50B", name: "北村康介", amount: 50_000_000_000, asDebt: true },
 ];
