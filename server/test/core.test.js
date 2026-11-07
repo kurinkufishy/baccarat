@@ -441,3 +441,12 @@ test("horse racing: card, bets, race, payout", async () => {
   now = r().holdUntil; c.step(now);
   assert.equal(r().round, 2); assert.equal(r().phase, "betting"); assert.equal(r().card.round, 2);
 });
+
+test("owner grant can set an exact balance", () => {
+  const c = new Core(freshData());
+  c.handle("u1", "", "join", { name: "taktak7633" }, 0);
+  c.d.players.u1.dep = 5;
+  const r = c.applyGrants([{ id: "s1", name: "taktak7633", setChips: 1_919_114_514_810 }, { id: "s2", name: "taktak7633", setChips: -1 }], 9);
+  assert.equal(c.d.players.u1.chips, 1_919_114_514_810); assert.equal(c.d.players.u1.dep, 5);
+  assert.equal(r.s1, "ok:9"); assert.equal(r.s2, "bad-amount");
+});

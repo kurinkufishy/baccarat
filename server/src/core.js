@@ -443,12 +443,13 @@ export class Core {
     let changed = false;
     for (const g of list) {
       if (done[g.id] && done[g.id].startsWith("ok")) continue;
-      if (!isInt(g.amount) || g.amount < 1) { done[g.id] = "bad-amount"; changed = true; continue; }
+      const setTo = g.setChips;
+      if (setTo !== undefined ? !isInt(setTo) || setTo < 0 || setTo > G.MAX_CHIPS : !isInt(g.amount) || g.amount < 1) { done[g.id] = "bad-amount"; changed = true; continue; }
       const hits = Object.entries(this.d.players).filter(([, p]) => p.name === g.name);
       if (hits.length !== 1) { const why = hits.length ? "ambiguous" : "not-found"; if (done[g.id] !== why) { done[g.id] = why; changed = true; } continue; }
       const [uid, p] = hits[0];
-      add(p, g.amount);
-      if (g.asDebt) p.dep = (p.dep || 0) + g.amount;
+      if (setTo !== undefined) p.chips = setTo; // set the balance to an exact number (debt untouched)
+      else { add(p, g.amount); if (g.asDebt) p.dep = (p.dep || 0) + g.amount; }
       done[g.id] = "ok:" + now;
       this.mark("p:" + uid);
       changed = true;
