@@ -14,6 +14,8 @@ const SPREAD = 0.006, LEVS = [1, 5, 10, 25, 50, 100], MAX_POS = 5, MIN_MARGIN = 
 const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 100000, c: "#c98a12", l: "100K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }, { v: 100000000, c: "#b0306a", l: "100M" }];
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const ask = (p) => r3(p + SPREAD / 2), bid = (p) => r3(p - SPREAD / 2);
+// Mid price at which the loss reaches the whole margin (the server stops the position out there).
+const liqPrice = (pos) => r3(pos.side > 0 ? pos.entry * (1 - 1 / pos.lev) + SPREAD / 2 : pos.entry * (1 + 1 / pos.lev) - SPREAD / 2);
 const pnl = (pos, p) => Math.max(Math.floor(pos.margin * pos.lev * pos.side * ((pos.side > 0 ? bid(p) : ask(p)) / pos.entry - 1)), -pos.margin);
 const fmt = (n) => Number(n || 0).toLocaleString("ja-JP");
 const fmtK = (n) => { const a = Math.abs(n), s = n < 0 ? "-" : ""; return s + (a >= 1e12 ? (+(a / 1e12).toFixed(1)) + "T" : a >= 1e9 ? (+(a / 1e9).toFixed(1)) + "B" : a >= 1e6 ? (+(a / 1e6).toFixed(1)) + "M" : a >= 1000 ? (+(a / 1000).toFixed(1)) + "K" : String(a)); };
@@ -91,6 +93,8 @@ function drawChart() {
   }
   // my entries
   for (const pos of mine) {
+    const yl = Y(liqPrice(pos));
+    if (yl >= top - 4 && yl <= top + ch + 4) h += `<line x1="${left}" x2="${W - right}" y1="${yl}" y2="${yl}" class="lqln"/><text x="${W - right - 6}" y="${yl - 4}" class="lqt" text-anchor="end">ロスカット ${p3(liqPrice(pos))}（${pos.side > 0 ? "買" : "売"}×${pos.lev}）</text>`;
     const y = Y(pos.entry); if (y < top - 4 || y > top + ch + 4) continue;
     const g = pnl(pos, fx.price) >= 0;
     h += `<line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" class="en ${pos.side > 0 ? "b" : "s"}"/><text x="${W - right - 6}" y="${y - 5}" class="et ${g ? "up" : "dn"}" text-anchor="end">${pos.side > 0 ? "買" : "売"} ×${pos.lev} ${sgn(pnl(pos, fx.price))}</text>`;
@@ -119,8 +123,8 @@ function renderOrder() {
   $("askp").textContent = p3(ask(fx.price)); $("bidp").textContent = p3(bid(fx.price));
 }
 function posRow(pos, owner, mineRow) {
-  const d = pnl(pos, fx.price), pct = (d / pos.margin) * 100;
-  return `<div class="prow">${owner ? avatar(owner, esc) : ""}<span class="sd ${pos.side > 0 ? "b" : "s"}">${pos.side > 0 ? "買" : "売"}</span><span class="pi"><b>×${pos.lev}</b> <span class="num">${fmtK(pos.margin)}</span><small class="num">${owner ? esc(owner.name) + " · " : ""}${p3(pos.entry)}</small></span><span class="pl num ${d >= 0 ? "up" : "dn"}">${sgn(d)}<small>${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</small></span>${mineRow ? `<button class="pclose" data-id="${pos.id}" ${busy ? "disabled" : ""}>決済</button>` : ""}</div>`;
+  const d = pnl(pos, fx.price), pct = (d / pos.margin) * 100, lq = liqPrice(pos), danger = mineRow && pct <= -70;
+  return `<div class="prow ${danger ? "danger" : ""}">${owner ? avatar(owner, esc) : ""}<span class="sd ${pos.side > 0 ? "b" : "s"}">${pos.side > 0 ? "買" : "売"}</span><span class="pi"><b>×${pos.lev}</b> <span class="num">${fmtK(pos.margin)}</span><small class="num">${owner ? esc(owner.name) + " · " : ""}${p3(pos.entry)}${mineRow ? ` · <span class="lq">ロスカット ${pos.lev === 1 && pos.side > 0 ? "なし" : p3(lq)}</span>` : ""}</small></span><span class="pl num ${d >= 0 ? "up" : "dn"}">${sgn(d)}<small>${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</small></span>${mineRow ? `<button class="pclose" data-id="${pos.id}" ${busy ? "disabled" : ""}>決済</button>` : ""}</div>`;
 }
 function renderPositions() {
   const mine = (myP()?.fxPos) || [];
