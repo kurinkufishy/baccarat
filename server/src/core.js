@@ -437,6 +437,44 @@ export class Core {
     return Object.keys(players).length;
   }
 
+  /* ---------------- admin page (only uids in ADMIN_UIDS reach this) ---------------- */
+  admin(by, m, now) {
+    const op = m.op;
+    if (op === "log") return { log: this.d.meta.adminLog || [] };
+    const p = this.d.players[m.uid];
+    if (!p) fail("そのプレイヤーはいないよ");
+    const int = (v, lo, hi) => { if (!isInt(v) || v < lo || v > hi) fail("数字がおかしいよ"); return v; };
+    const before = { chips: p.chips, dep: p.dep || 0, name: p.name, note: p.note || "" };
+    let what;
+    if (op === "add") {
+      const n = int(m.amount, -G.MAX_CHIPS, G.MAX_CHIPS);
+      if (!n) fail("0以外を入れてね");
+      p.chips = Math.max(0, Math.min(p.chips + n, G.MAX_CHIPS));
+      if (m.asDebt && n > 0) p.dep = (p.dep || 0) + n;
+      what = `${n > 0 ? "+" : ""}${n.toLocaleString("ja-JP")}${m.asDebt && n > 0 ? "（借金）" : ""}`;
+    } else if (op === "setChips") { p.chips = int(m.amount, 0, G.MAX_CHIPS); what = `残高を ${p.chips.toLocaleString("ja-JP")} に`; }
+    else if (op === "setDebt") { p.dep = int(m.amount, 0, G.MAX_CHIPS); what = `借金を ${p.dep.toLocaleString("ja-JP")} に`; }
+    else if (op === "setNet") {
+      const n = int(m.amount, -G.MAX_CHIPS, G.MAX_CHIPS), chips = n + G.START + (p.dep || 0);
+      if (chips >= 0) p.chips = Math.min(chips, G.MAX_CHIPS); else { p.chips = 0; p.dep = (p.dep || 0) - chips; }
+      what = `収支を ${n.toLocaleString("ja-JP")} に`;
+    } else if (op === "note") {
+      if (typeof m.text !== "string") fail("ひとことがおかしいよ");
+      const t = m.text.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 30);
+      if (t) p.note = t; else delete p.note;
+      what = t ? `ひとこと「${t}」` : "ひとことを消す";
+    } else if (op === "rename") {
+      let name;
+      try { name = G.cleanName(m.name); } catch { fail("名前は1〜12文字で入れてね"); }
+      if (this.nameTaken(name, m.uid)) fail("その名前はもう使われてるよ");
+      p.name = name; what = `名前を「${name}」に`;
+    } else fail("その操作はないよ");
+    const log = this.d.meta.adminLog || [];
+    this.d.meta.adminLog = [{ at: now, by: (this.d.players[by] || {}).name || "運営", target: before.name, op, what }, ...log].slice(0, 60);
+    this.mark("p:" + m.uid, "meta");
+    return { before, after: { chips: p.chips, dep: p.dep || 0, name: p.name, note: p.note || "" } };
+  }
+
   /* ---------------- owner grants (see grants.js) ---------------- */
   applyGrants(list, now) {
     const meta = this.d.meta, done = (meta.grants = meta.grants || {});

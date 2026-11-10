@@ -19,3 +19,5 @@ ALLOWED_ORIGINS = "https://kurinkufishy.github.io"
 # Leave empty to let any Google account join, or list Gmail addresses (comma separated) to invite only them
 ALLOWED_EMAILS = ""
 ALLOW_LOCALHOST = "0"
+# Firebase user IDs (comma separated) that can open admin.html. A user ID is not personal info; admin.html shows yours.
+ADMIN_UIDS = ""

@@ -144,6 +144,18 @@ export class Casino extends DurableObject {
     }
     if (!att.uid) { reply(false, { error: "ログインしてね" }); return; }
     if (m.type === "ping") { reply(true, {}); return; }
+    if (m.type === "admin") {
+      const admins = csv(this.env.ADMIN_UIDS), isAdmin = admins.includes(att.uid);
+      if (m.op === "whoami") { reply(true, { data: { uid: att.uid, admin: isAdmin } }); return; }
+      if (!isAdmin) { reply(false, { error: "このアカウントは運営じゃないよ" }); return; }
+      try {
+        this.core.step(Date.now());
+        const data = this.core.admin(att.uid, m, Date.now());
+        await this.commit();
+        reply(true, { data });
+      } catch (e) { if (e instanceof GameError) reply(false, { error: e.message }); else { console.error(e); reply(false, { error: "うまくいかなかった" }); await this.load(); } }
+      return;
+    }
     if (m.type === "fxWatch") {
       ws.serializeAttachment({ ...att, fxAt: Date.now() });
       this.fxEnsure();

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com wss://*.workers.dev; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>運営パネル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="adm">
+  <header class="ahead">
+    <h1>運営パネル</h1>
+    <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
+    <a class="ib" href="./">サイトに戻る</a>
+    <button class="ib" id="signout" hidden>ログアウト</button>
+  </header>
+  <section class="abox" id="gate"></section>
+  <main class="amain" id="main" hidden>
+    <section class="abox alist">
+      <input id="q" class="ain" placeholder="名前でさがす" autocomplete="off">
+      <div class="sorts" id="sorts"><button data-s="net" class="on">収支順</button><button data-s="chips">残高順</button><button data-s="dep">借金順</button><button data-s="name">名前順</button></div>
+      <div id="plist" class="plist"></div>
+    </section>
+    <section class="abox adetail" id="detail"></section>
+  </main>
+  <section class="abox" id="logbox" hidden>
+    <h2>操作の記録 <button class="ib sm" id="reloadlog">更新</button></h2>
+    <div id="log" class="alog"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

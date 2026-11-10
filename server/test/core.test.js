@@ -463,3 +463,27 @@ test("owner grant can set the ranking net exactly, with a note", () => {
   c.applyGrants([{ id: "n2", name: "taktak7633", setNet: -10_000_000_000 }], 2);
   assert.equal(p.chips, 0); assert.equal(p.chips - p.dep - G.START, -10_000_000_000);
 });
+
+test("admin operations", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("boss", "", "join", { name: "運営" }, 0);
+  c.handle("u", "", "join", { name: "北村" }, 0);
+  const p = c.d.players.u;
+  c.admin("boss", { op: "add", uid: "u", amount: 5000, asDebt: true }, 1);
+  assert.equal(p.chips, 15000); assert.equal(p.dep, 5000);
+  c.admin("boss", { op: "add", uid: "u", amount: -100000 }, 2); assert.equal(p.chips, 0);
+  c.admin("boss", { op: "setChips", uid: "u", amount: 777 }, 3); assert.equal(p.chips, 777);
+  c.admin("boss", { op: "setDebt", uid: "u", amount: 0 }, 4); assert.equal(p.dep, 0);
+  c.admin("boss", { op: "setNet", uid: "u", amount: -50 }, 5); assert.equal(p.chips - p.dep - G.START, -50);
+  c.admin("boss", { op: "note", uid: "u", text: "  パソコン売った‮ " }, 6); assert.equal(p.note, "パソコン売った");
+  c.admin("boss", { op: "note", uid: "u", text: "" }, 7); assert.equal(p.note, undefined);
+  nc(() => c.admin("boss", { op: "rename", uid: "u", name: "運営" }, 8), /使われてる/);
+  c.admin("boss", { op: "rename", uid: "u", name: "北村さん" }, 9); assert.equal(p.name, "北村さん");
+  nc(() => c.admin("boss", { op: "add", uid: "nobody", amount: 1 }, 10), /いない/);
+  nc(() => c.admin("boss", { op: "add", uid: "u", amount: 1.5 }, 10), /数字/);
+  nc(() => c.admin("boss", { op: "wipe", uid: "u" }, 10), /ない/);
+  const log = c.admin("boss", { op: "log" }, 11).log;
+  assert.equal(log.length, 8); assert.equal(log[0].by, "運営"); assert.match(log[0].what, /北村さん/);
+  assert.deepEqual(c.view("meta"), { imported: false }, "the admin log is not broadcast");
+});
