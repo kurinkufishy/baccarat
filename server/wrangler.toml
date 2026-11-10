@@ -20,4 +20,4 @@ ALLOWED_ORIGINS = "https://kurinkufishy.github.io"
 ALLOWED_EMAILS = ""
 ALLOW_LOCALHOST = "0"
 # Firebase user IDs (comma separated) that can open admin.html. A user ID is not personal info; admin.html shows yours.
-ADMIN_UIDS = ""
+ADMIN_UIDS = "AJ4U94NgIyUDZ35wtQXqfxBVfh03"
