@@ -12,4 +12,5 @@ export const GRANTS = [
   { id: "2026-11-07-kitamura-50B", name: "北村康介", amount: 50_000_000_000, asDebt: true },
   { id: "2026-11-07-taktak7633-pc", name: "taktak7633", setNet: -10_000_000_000, note: "金なさすぎて売ったパソコン" },
   { id: "2026-11-07-kitamura-99.9B", name: "北村康介", amount: 99_900_000_000, asDebt: true },
+  { id: "2026-11-10-kitamura-1T", name: "北村康介", amount: 1_000_000_000_000, asDebt: true },
 ];
