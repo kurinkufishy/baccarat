@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com wss://*.workers.dev; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>仲間内ポーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rubik:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="keiba.css">
+<link rel="stylesheet" href="poker.css">
+<style>body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div class="app">
+  <div class="migbar" id="migbar" hidden></div>
+  <section class="stage poker" id="stage" aria-label="ポーカーテーブル">
+    <div class="ptable" id="ptable"><div class="felt"><div class="center"><div class="board" id="board"></div><div class="pot num" id="pot"></div><div class="lastact" id="lastact"></div></div></div><div id="seats"></div></div>
+    <div class="hud">
+      <div class="tname">仲間内ポーカー <span class="num" id="roundtxt"></span><small id="stakeTxt">テキサスホールデム・最大6人</small></div>
+      <div class="icons">
+        <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
+        <button class="ib" id="statsbtn" aria-pressed="false" hidden>統計</button>
+        <button class="ib" id="rulesbtn">ルール</button>
+        <button class="ib acct" id="acctbtn" hidden></button>
+      </div>
+    </div>
+    <div id="pill" aria-live="polite"></div>
+    <div class="gate" id="gate">
+      <div class="gatebox" id="gatebox"><h1>POKER</h1><p>接続中…</p></div>
+    </div>
+  </section>
+
+  <div class="kconsole">
+    <section class="kp" aria-label="アクション">
+      <div class="kh">アクション <span class="mut" id="actnote"></span></div>
+      <div id="actions"></div>
+    </section>
+    <div class="kside">
+      <section class="kp" aria-label="このハンド">
+        <div class="kh">このハンド</div>
+        <div class="klist" id="plog"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="overlay" id="sitm" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sitt">
+      <div class="mhead"><span id="sitt">席に座る</span><button class="x" data-close aria-label="閉じる">×</button></div>
+      <div id="sitbody"></div>
+    </div>
+  </div>
+
+  <div class="chipbar" id="chipbar">
+    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり・あげる）" disabled>+</button></div>
+    <div class="mid" id="mid"></div>
+    <div class="totbet"><span class="lb">テーブル</span><span class="amt num" id="mytotal">0</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="walletm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
+    <div class="mhead"><span id="wt">ウォレット</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="wsum"><div><span>残高</span><b class="num" id="wbal">0</b></div><div><span>借金</span><b class="num" id="wdebt">0</b></div></div>
+    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button><button data-w="give" role="tab">あげる</button><button data-w="bank" role="tab">銀行</button></div>
+    <div class="wbody" id="wbody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="rulesm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rt">
+    <div class="mhead"><span id="rt">ルール</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="rules">
+      <b>ポーカー</b>　テキサスホールデム（ノーリミット）。相手は胴元じゃなくて友達。手札2枚と場の5枚で一番強い5枚を作る。<br>
+      <b>座り方</b>　空いてる席を押して、テーブルに持ち込むチップを決める。最初に座った人がレート（ブラインド）を決める。2人以上座ると自動で始まる。<br>
+      <b>流れ</b>　ブラインド→手札2枚→ベット→フロップ3枚→ベット→ターン1枚→ベット→リバー1枚→ベット→ショーダウン。自分の番は20秒で、過ぎるとチェックかフォールドになって、次のハンドから休憩扱いになる（「戻る」で復帰）。<br>
+      <b>役</b>　強い順にロイヤルストレートフラッシュ、ストレートフラッシュ、フォーカード、フルハウス、フラッシュ、ストレート、スリーカード、ツーペア、ワンペア、ハイカード。<br>
+      <b>公平さ</b>　シャッフルと配りはサーバーがやって、他の人の手札は自分の画面には届かない（ショーダウンまで本当に見えない）。<br>
+      <b>チップ</b>　席を立つと、テーブルのチップは残高に戻る。手数料はなし。
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="acctm" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="at">
+    <div class="mhead"><span id="at">アカウント</span><button class="x" data-close aria-label="閉じる">×</button></div>
+    <div class="sumline"><span>ログイン中</span><span id="acctmail"></span></div>
+        <button class="ib" id="signout" style="justify-content:center;height:40px">ログアウト</button>
+  </div>
+</div>
+
+<div class="statsp" id="statsp" hidden role="region" aria-label="自分の統計">
+  <div class="mhead"><span>自分の統計</span><button class="x" id="statsx" aria-label="閉じる">×</button></div>
+  <div class="tiles">
+    <div class="tile"><span>利益</span><b class="num" id="s_prof">0</b></div>
+    <div class="tile"><span>賭け総額</span><b class="num" id="s_wag">0</b></div>
+    <div class="tile"><span>勝率</span><b class="num" id="s_rate">–</b></div>
+  </div>
+  <div class="winbar" id="winbar"></div>
+  <div class="legend2" id="wl"></div>
+  <div class="chartbox" id="chartbox"></div>
+  <p class="small">ハンドごとの累計利益。</p>
+</div>
+
+<script type="module" src="poker.js"></script>
+</body>
+</html>

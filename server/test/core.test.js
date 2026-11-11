@@ -538,3 +538,65 @@ test("virtual football: bet, play, payout", () => {
   assert.ok(c.d.players.a.ach.sp1);
   now = s().holdUntil; c.step(now); assert.equal(s().round, 2);
 });
+
+test("poker: hand strength and side pots", async () => {
+  const P = await import("../src/poker.js");
+  const b = (s) => P.best(s.split(" "));
+  assert.equal(b("AS KS QS JS TS 2D 3C").name, "ロイヤルストレートフラッシュ");
+  assert.equal(b("5S 4D 3H 2C AS KD 9C").name, "ストレート");
+  assert.ok(b("AS AD AH KC KD 2S 3S").s > b("AS AD AH KC QD 2S 3S").s, "full house beats trips");
+  assert.ok(b("2S 3S 4S 5S 7S 9D 9C").s > b("9S 9D 9H 8C 7D 2S 3C").s, "flush beats trips");
+  assert.equal(b("KS KD 7H 7C 2D 2S AS").name, "ツーペア");
+  assert.ok(b("KS KD 7H 7C 2D 2S AS").s > b("KS KD 7H 7C 2D 2S QS").s, "kicker counts");
+  // a short all-in can only win what it covered
+  const won = P.splitPots({ a: 100, b: 500, c: 500 }, ["a", "b", "c"], { a: 9, b: 5, c: 1 }, ["a", "b", "c"]);
+  assert.deepEqual(won, { a: 300, b: 800 });
+  const split = P.splitPots({ a: 101, b: 101, c: 50 }, ["a", "b"], { a: 3, b: 3 }, ["b", "a"]);
+  assert.equal(split.a + split.b, 252); assert.equal(split.b, 126);
+});
+
+test("poker: a full hand between three players", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  for (const u of ["a", "b", "x"]) { c.handle(u, "", "join", { name: u }, 0); c.d.players[u].chips = 1_000_000; }
+  nc(() => c.handle("a", "", "pkSit", { seat: 0, buyin: 100000 }, 0), /レート/);
+  c.handle("a", "", "pkSit", { seat: 0, buyin: 100000, stake: 0 }, 0);
+  nc(() => c.handle("b", "", "pkSit", { seat: 0, buyin: 100000 }, 0), /埋まって/);
+  nc(() => c.handle("b", "", "pkSit", { seat: 1, buyin: 1000 }, 0), /持ち込み/);
+  c.handle("b", "", "pkSit", { seat: 1, buyin: 100000 }, 0);
+  c.handle("x", "", "pkSit", { seat: 3, buyin: 40000 }, 0);
+  const t = () => c.d.pk, h = () => c.d.pk.hand;
+  let now = 3000; c.step(now);
+  assert.ok(h(), "hand starts after the pause");
+  assert.equal(c.view("pk").hand.shown && Object.keys(c.view("pk").hand.shown).length, 0, "nobody's cards are public");
+  assert.equal(c.pkMine("a").cards.length, 2);
+  // button seat 0 (a), sb b, bb x; a acts first
+  assert.equal(h().toAct, "a");
+  nc(() => c.handle("b", "", "pkAct", { act: "call" }, now), /番じゃない/);
+  nc(() => c.handle("a", "", "pkAct", { act: "check" }, now), /チェックできない/);
+  nc(() => c.handle("a", "", "pkAct", { act: "raise", amount: 300 }, now), /最低/);
+  c.handle("a", "", "pkAct", { act: "raise", amount: 6000 }, now);
+  c.handle("b", "", "pkAct", { act: "call" }, now);
+  c.handle("x", "", "pkAct", { act: "allin" }, now);       // x shoves 40000
+  c.handle("a", "", "pkAct", { act: "call" }, now);
+  c.handle("b", "", "pkAct", { act: "fold" }, now);
+  // a and x: x is all-in, so the board runs out and it goes to showdown
+  assert.equal(h().phase, "showdown"); assert.equal(h().board.length, 5);
+  const total = Object.values(t().stacks).reduce((s, v) => s + v, 0);
+  assert.equal(total, 240000, "no chips created or lost");
+  assert.ok(Object.keys(h().shown).length === 2);
+  now = h().endsAt; c.step(now);
+  assert.equal(h(), null);
+  const chipsNow = ["a", "b", "x"].reduce((s, u) => s + c.d.players[u].chips + (t().stacks[u] || 0), 0);
+  assert.equal(chipsNow, 3_000_000, "everyone's chips + stacks add up");
+  assert.ok(c.d.players.a.ach.pk1 && c.d.players.a.pkst.n === 1);
+  // timeouts fold and sit you out
+  now += 3000; c.step(now);
+  if (h()) { const u = h().toAct; now = h().turnEndsAt; c.step(now); assert.ok(t().away[u]); }
+  c.handle("b", "", "pkLeave", {}, now);
+  for (let i = 0; i < 60 && t().seats.includes("b"); i++) { now += 21000; c.step(now); }
+  assert.equal(t().seats.indexOf("b"), -1, "left the table");
+  const settled = !h() || h().phase === "showdown" || h().phase === "done";
+  const sum = ["a", "b", "x"].reduce((s, u) => s + c.d.players[u].chips + (t().stacks[u] || 0) + (!settled && h().contrib[u] || 0), 0);
+  assert.equal(sum, 3_000_000, "chips are only ever moved, never made");
+});

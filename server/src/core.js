@@ -7,6 +7,7 @@ import * as A from "./ach.js";
 import * as F from "./fxgame.js";
 import * as R from "./race.js";
 import * as S from "./sports.js";
+import * as P from "./poker.js";
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -15,7 +16,8 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {} });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {}, pk: freshPk(), pkDeck: { deck: [], hole: {} } });
+export const freshPk = () => ({ stake: null, seats: [null, null, null, null, null, null], stacks: {}, away: {}, leaving: {}, hand: null, nextHandAt: 0, handSeq: 0, button: -1 });
 export const freshSp = () => ({ round: 1, phase: "paused", closesAt: 0, match: null, startAt: 0, endAt: 0, holdUntil: 0, ev: null, score: null, history: [], idle: 0, hadBets: false });
 export const freshRc = () => ({ round: 1, phase: "paused", closesAt: 0, card: null, startAt: 0, endAt: 0, holdUntil: 0, unit: 0, script: null, res: null, history: [], idle: 0, hadBets: false });
 const RENAME_COST = 1_000_000;
@@ -58,6 +60,11 @@ export class Core {
       case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
       case "rcBets": return this.rcSetBets(uid, m.bets, m.round, now);
       case "spBets": return this.spSetBets(uid, m.bets, m.round, now);
+      case "pkSit": return this.pkSit(uid, m.seat, m.buyin, m.stake, now);
+      case "pkTopUp": return this.pkTopUp(uid, m.amount);
+      case "pkLeave": return this.pkLeave(uid, now);
+      case "pkBack": return this.pkBack(uid, now);
+      case "pkAct": return this.pkAct(uid, m.act, m.amount, now);
       case "hlOpen": return this.hlOpen(uid, m.dir, m.amount, m.dur, now);
       case "bank": return this.bankOp(uid, m.op, m.amount, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
@@ -405,17 +412,18 @@ export class Core {
   step(now) {
     const did = [];
     for (let i = 0; i < 6; i++) {
-      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now);
+      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now), f = this.pkStep(now);
       if (a) did.push("bac:" + a);
       if (b) did.push("bj:" + b);
       if (c) did.push("rc:" + c);
       if (e) did.push("sp:" + e);
-      if (!a && !b && !c && !e) break;
+      if (f) did.push("pk:" + f);
+      if (!a && !b && !c && !e && !f) break;
     }
     return did;
   }
   nextDue() {
-    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue()].filter((x) => x !== null);
+    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue(), this.pkDue()].filter((x) => x !== null);
     return ts.length ? Math.min(...ts) : null;
   }
 
@@ -658,6 +666,233 @@ export class Core {
     return null;
   }
 
+  /* ---------------- poker (Texas Hold'em, players against each other) ---------------- */
+  pkT() { return this.d.pk || (this.d.pk = freshPk()); }
+  pkBlinds() { const t = this.pkT(); return t.stake === null ? null : P.PK.STAKES[t.stake]; }
+  pkSeatOf(uid) { return this.pkT().seats.indexOf(uid); }
+  pkInHand(uid) { const h = this.pkT().hand; return !!h && h.phase !== "done" && h.phase !== "showdown" && h.players.includes(uid) && !h.folded[uid]; }
+  pkSit(uid, seat, buyin, stake, now) {
+    const p = this.player(uid), t = this.pkT();
+    if (!isInt(seat) || seat < 0 || seat >= P.PK.SEATS) fail("席がおかしいよ");
+    if (t.seats[seat]) fail("その席はもう埋まってるよ");
+    if (this.pkSeatOf(uid) >= 0) fail("もう座ってるよ");
+    if (t.seats.every((s) => !s)) {
+      if (!isInt(stake) || stake < 0 || stake >= P.PK.STAKES.length) fail("レートを選んでね");
+      t.stake = stake;
+    }
+    const [, bb] = this.pkBlinds();
+    if (!isInt(buyin) || buyin < bb * P.PK.MIN_BB || buyin > bb * P.PK.MAX_BB) fail(`持ち込みは ${(bb * P.PK.MIN_BB).toLocaleString("ja-JP")}〜${(bb * P.PK.MAX_BB).toLocaleString("ja-JP")}`);
+    if (buyin > p.chips) fail("チップが足りない。残高の＋から借りられるよ");
+    p.chips -= buyin;
+    t.seats[seat] = uid; t.stacks[uid] = buyin; delete t.away[uid]; delete t.leaving[uid];
+    this.pkMaybeStart(now);
+    this.mark("p:" + uid, "pk");
+  }
+  pkTopUp(uid, amount) {
+    const p = this.player(uid), t = this.pkT();
+    if (this.pkSeatOf(uid) < 0) fail("座ってないよ");
+    if (this.pkInHand(uid)) fail("このハンドが終わってから足してね");
+    const [, bb] = this.pkBlinds();
+    if (!isInt(amount) || amount < 1) fail("金額を入れてね");
+    if ((t.stacks[uid] || 0) + amount > bb * P.PK.MAX_BB) fail(`テーブルに持てるのは ${(bb * P.PK.MAX_BB).toLocaleString("ja-JP")} まで`);
+    if (amount > p.chips) fail("チップが足りない");
+    p.chips -= amount; t.stacks[uid] = (t.stacks[uid] || 0) + amount;
+    this.pkMaybeStart(Date.now());
+    this.mark("p:" + uid, "pk");
+  }
+  pkLeave(uid, now) {
+    const t = this.pkT(), seat = this.pkSeatOf(uid);
+    if (seat < 0) fail("座ってないよ");
+    const h = t.hand;
+    if (h && h.players.includes(uid) && h.phase !== "done" && h.phase !== "showdown") {
+      if (!h.folded[uid]) { h.folded[uid] = true; h.log = [...h.log, { u: uid, a: "fold" }].slice(-8); if (h.toAct === uid) this.pkAdvance(now); else this.pkAdvance(now, true); }
+      t.leaving[uid] = true; // stack goes back when the hand ends
+    } else this.pkStandUp(uid);
+    this.mark("pk");
+  }
+  pkStandUp(uid) {
+    const t = this.pkT(), seat = this.pkSeatOf(uid), p = this.d.players[uid];
+    if (seat >= 0) t.seats[seat] = null;
+    if (p) { p.chips = Math.min(p.chips + (t.stacks[uid] || 0), G.MAX_CHIPS); this.mark("p:" + uid); }
+    delete t.stacks[uid]; delete t.away[uid]; delete t.leaving[uid];
+    if (t.seats.every((s) => !s)) { t.stake = null; t.nextHandAt = 0; }
+  }
+  pkBack(uid, now) { const t = this.pkT(); delete t.away[uid]; this.pkMaybeStart(now); this.mark("pk"); }
+  pkEligible() { const t = this.pkT(); return t.seats.map((u, i) => [u, i]).filter(([u]) => u && (t.stacks[u] || 0) > 0 && !t.away[u] && !t.leaving[u]); }
+  pkMaybeStart(now) { const t = this.pkT(); if (!t.hand && !t.nextHandAt && this.pkEligible().length >= 2) t.nextHandAt = now + P.PK.START_MS; }
+
+  pkStartHand(now) {
+    const t = this.pkT(), elig = this.pkEligible();
+    t.nextHandAt = 0;
+    if (elig.length < 2) return false;
+    const [sbAmt, bbAmt] = this.pkBlinds();
+    const seatsIn = elig.map(([, i]) => i);
+    const after = (i) => { for (let k = 1; k <= P.PK.SEATS; k++) { const j = (i + k) % P.PK.SEATS; if (seatsIn.includes(j)) return j; } return i; };
+    const button = after(t.button >= 0 ? t.button : P.PK.SEATS - 1);
+    t.button = button;
+    const heads = seatsIn.length === 2, sb = heads ? button : after(button), bb = after(sb);
+    const order = []; for (let k = 1, j = button; k <= seatsIn.length; k++) { j = after(j); order.push(t.seats[j]); } // from the left of the button
+    const deck = P.newDeck(), hole = {};
+    for (const u of order) hole[u] = [deck.pop(), deck.pop()];
+    t.handSeq = (t.handSeq || 0) + 1;
+    const h = t.hand = { id: t.handSeq, phase: "preflop", button, sbSeat: sb, bbSeat: bb, players: order, board: [], bets: {}, contrib: {}, folded: {}, allin: {}, acted: {},
+      curBet: 0, minRaise: bbAmt, toAct: null, turnEndsAt: 0, shown: {}, results: null, log: [], endsAt: 0, start: Object.fromEntries(order.map((u) => [u, t.stacks[u]])) };
+    this.d.pkDeck = { deck, hole };
+    this.mark("pkDeck");
+    const post = (u, amt) => { const a = Math.min(amt, t.stacks[u]); t.stacks[u] -= a; h.bets[u] = (h.bets[u] || 0) + a; h.contrib[u] = (h.contrib[u] || 0) + a; if (!t.stacks[u]) h.allin[u] = true; };
+    post(t.seats[sb], sbAmt); post(t.seats[bb], bbAmt);
+    h.curBet = Math.max(...Object.values(h.bets));
+    h.log = [{ u: t.seats[sb], a: "sb", n: h.bets[t.seats[sb]] }, { u: t.seats[bb], a: "bb", n: h.bets[t.seats[bb]] }];
+    // First to act preflop: left of the big blind (the button/small blind when heads-up).
+    const firstSeat = heads ? sb : after(bb);
+    h.toAct = this.pkNextToAct(h, t.seats[firstSeat], true);
+    if (!h.toAct) this.pkRunOut(now); else h.turnEndsAt = now + P.PK.TURN_MS;
+    this.mark("pk");
+    return true;
+  }
+  /** Next player who still has to act, starting at uid (inclusive when incl). */
+  pkNextToAct(h, fromUid, incl) {
+    const t = this.pkT(), n = h.players.length, start = h.players.indexOf(fromUid);
+    for (let k = incl ? 0 : 1; k <= n; k++) {
+      const u = h.players[(start + k + n) % n];
+      if (h.folded[u] || h.allin[u]) continue;
+      if (!h.acted[u] || (h.bets[u] || 0) < h.curBet) return u;
+    }
+    void t; return null;
+  }
+  pkAct(uid, act, amount, now) {
+    const t = this.pkT(), h = t.hand;
+    if (!h || h.phase === "done" || h.phase === "showdown") fail("今はハンド中じゃないよ");
+    if (h.toAct !== uid) fail("まだあなたの番じゃないよ");
+    const stack = t.stacks[uid] || 0, bet = h.bets[uid] || 0, owe = h.curBet - bet;
+    const [, bb] = this.pkBlinds();
+    const move = (a) => { t.stacks[uid] -= a; h.bets[uid] = bet + a; h.contrib[uid] = (h.contrib[uid] || 0) + a; if (!t.stacks[uid]) h.allin[uid] = true; };
+    let rec;
+    if (act === "fold") { h.folded[uid] = true; rec = { u: uid, a: "fold" }; }
+    else if (act === "check") { if (owe > 0) fail("チェックできないよ（コールかフォールド）"); rec = { u: uid, a: "check" }; }
+    else if (act === "call") { if (owe <= 0) fail("コールするものがないよ"); const a = Math.min(owe, stack); move(a); rec = { u: uid, a: h.allin[uid] ? "allin" : "call", n: h.bets[uid] }; }
+    else if (act === "raise" || act === "allin") {
+      const to = act === "allin" ? bet + stack : amount;
+      if (!isInt(to) || to <= h.curBet) { if (act === "allin" && stack > 0) { move(stack); rec = { u: uid, a: "allin", n: h.bets[uid] }; } else fail("レイズ額がおかしいよ"); }
+      else {
+        if (to > bet + stack) fail("スタックが足りないよ");
+        const wasOpen = h.curBet === 0;
+        const inc = to - h.curBet, minTo = h.curBet + Math.max(h.minRaise, bb);
+        if (to < minTo && to < bet + stack) fail(`最低 ${minTo.toLocaleString("ja-JP")} まで上げてね`);
+        move(to - bet);
+        if (inc >= h.minRaise) { h.minRaise = inc; h.acted = {}; }
+        h.curBet = to;
+        rec = { u: uid, a: h.allin[uid] ? "allin" : wasOpen ? "bet" : "raise", n: to };
+      }
+    } else fail("その操作はないよ");
+    h.acted[uid] = true;
+    delete t.away[uid];
+    h.log = [...h.log, rec].slice(-8);
+    this.pkAdvance(now);
+    this.mark("pk");
+  }
+  /** After an action (or a fold out of turn): move to the next player, street, or the end of the hand. */
+  pkAdvance(now, outOfTurn) {
+    const t = this.pkT(), h = t.hand;
+    const live = h.players.filter((u) => !h.folded[u]);
+    if (live.length === 1) return this.pkFinish(now, live);
+    if (outOfTurn && h.toAct && !h.folded[h.toAct]) return; // the player whose turn it is still has to act
+    const next = this.pkNextToAct(h, h.toAct || h.players[0], false);
+    if (next) { h.toAct = next; h.turnEndsAt = now + P.PK.TURN_MS; return; }
+    this.pkNextStreet(now);
+  }
+  pkNextStreet(now) {
+    const t = this.pkT(), h = t.hand, dk = this.d.pkDeck;
+    const canAct = h.players.filter((u) => !h.folded[u] && !h.allin[u]);
+    const deal = () => { if (h.phase === "preflop") { h.board.push(dk.deck.pop(), dk.deck.pop(), dk.deck.pop()); h.phase = "flop"; } else if (h.phase === "flop") { h.board.push(dk.deck.pop()); h.phase = "turn"; } else if (h.phase === "turn") { h.board.push(dk.deck.pop()); h.phase = "river"; } else return false; return true; };
+    if (h.phase === "river") return this.pkShowdown(now);
+    deal();
+    this.mark("pkDeck");
+    h.bets = {}; h.curBet = 0; h.minRaise = this.pkBlinds()[1]; h.acted = {};
+    if (canAct.length <= 1) return this.pkRunOut(now);
+    // Postflop the first player left of the button acts first (h.players already starts there).
+    h.toAct = this.pkNextToAct(h, h.players[0], true);
+    h.turnEndsAt = now + P.PK.TURN_MS;
+  }
+  pkRunOut(now) {
+    const t = this.pkT(), h = t.hand, dk = this.d.pkDeck;
+    while (h.board.length < 5) h.board.push(dk.deck.pop());
+    h.phase = "river"; h.runout = true;
+    this.mark("pkDeck");
+    this.pkShowdown(now);
+  }
+  pkShowdown(now) {
+    const t = this.pkT(), h = t.hand, hole = this.d.pkDeck.hole;
+    while (h.board.length < 5) h.board.push(this.d.pkDeck.deck.pop());
+    const live = h.players.filter((u) => !h.folded[u]);
+    const scores = {}, names = {};
+    for (const u of live) { const b = P.best([...hole[u], ...h.board]); scores[u] = b.s; names[u] = b; h.shown[u] = hole[u]; }
+    const won = P.splitPots(h.contrib, live, scores, h.players);
+    for (const [u, w] of Object.entries(won)) t.stacks[u] = (t.stacks[u] || 0) + w;
+    h.results = live.map((u) => ({ u, won: won[u] || 0, hand: names[u].name, cat: names[u].cat, royal: names[u].royal, best: names[u].best })).sort((a, b) => b.won - a.won);
+    h.phase = "showdown"; h.toAct = null; h.endsAt = now + P.PK.SHOW_MS;
+    this.pkTally(now);
+  }
+  pkFinish(now, live) {
+    const t = this.pkT(), h = t.hand, u = live[0];
+    const pot = Object.values(h.contrib).reduce((a, b) => a + b, 0);
+    t.stacks[u] = (t.stacks[u] || 0) + pot;
+    h.results = [{ u, won: pot, hand: null }];
+    h.phase = "done"; h.toAct = null; h.endsAt = now + P.PK.WIN_MS;
+    this.pkTally(now);
+  }
+  /** Stats and achievements once a hand is decided. */
+  pkTally(now) {
+    const t = this.pkT(), h = t.hand, [, bb] = this.pkBlinds();
+    for (const u of h.players) {
+      const p = this.d.players[u]; if (!p) continue;
+      const d = (t.stacks[u] || 0) - (h.start[u] || 0), r = (h.results || []).find((x) => x.u === u);
+      const st = p.pkst || freshStats();
+      st.n++; st.wag += h.contrib[u] || 0; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+      p.pkst = st; p.pkcurve = [...(p.pkcurve || []), st.prof].slice(-300);
+      A.checkResult(p, d, false, now);
+      A.unlock(p, "pk1", now);
+      if (r && r.won > 0) {
+        if (h.phase === "showdown" && h.allin[u]) A.unlock(p, "pkallin", now);
+        if (r.won >= bb * 100) A.unlock(p, "pkbig", now);
+      }
+      if (r && r.cat >= 7) A.unlock(p, "pkquads", now);
+      if (r && r.royal) A.unlock(p, "pkroyal", now);
+      if (st.n >= 100) A.unlock(p, "pk100", now);
+      this.mark("p:" + u);
+    }
+  }
+  pkStep(now) {
+    const t = this.pkT(), h = t.hand;
+    if (h && (h.phase === "showdown" || h.phase === "done")) {
+      if (now < h.endsAt) return null;
+      t.hand = null; this.d.pkDeck = { deck: [], hole: {} };
+      this.mark("pkDeck");
+      for (const u of [...t.seats]) if (u && (t.leaving[u] || !(t.stacks[u] > 0))) this.pkStandUp(u);
+      this.pkMaybeStart(now);
+      this.mark("pk");
+      return "end";
+    }
+    if (h && h.toAct && now >= h.turnEndsAt) {
+      const u = h.toAct, owe = h.curBet - (h.bets[u] || 0);
+      t.away[u] = true; // timed out: sits out from the next hand until they come back
+      this.pkAct(u, owe > 0 ? "fold" : "check", 0, now);
+      t.away[u] = true;
+      return "timeout";
+    }
+    if (!h && t.nextHandAt && now >= t.nextHandAt) { const ok = this.pkStartHand(now); this.mark("pk"); return ok ? "deal" : "wait"; }
+    return null;
+  }
+  pkDue() {
+    const t = this.d.pk; if (!t) return null;
+    const h = t.hand;
+    if (h && (h.phase === "showdown" || h.phase === "done")) return h.endsAt;
+    if (h && h.toAct) return h.turnEndsAt;
+    if (!h && t.nextHandAt) return t.nextHandAt;
+    return null;
+  }
+  pkMine(uid) { const h = this.pkT().hand, dk = this.d.pkDeck; return h && dk && dk.hole[uid] ? { id: h.id, cards: dk.hole[uid] } : null; }
+
   /* ---------------- FX ---------------- */
   /** Move the market one tick and stop out anyone whose position has lost its whole margin. */
   fxTick(now) {
@@ -792,12 +1027,13 @@ export class Core {
     if (key === "rcBets") return d.rcBets;
     if (key === "sp") { const s = d.sp; return { ...s, match: s.match && { round: s.match.round, home: s.match.home, away: s.match.away, odds: s.match.odds } }; }
     if (key === "spBets") return d.spBets;
+    if (key === "pk") return d.pk;
     if (key === "meta") return { imported: !!d.meta.imported };
     if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, pk: this.d.pk, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }
