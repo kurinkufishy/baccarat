@@ -600,3 +600,31 @@ test("poker: a full hand between three players", () => {
   const sum = ["a", "b", "x"].reduce((s, u) => s + c.d.players[u].chips + (t().stacks[u] || 0) + (!settled && h().contrib[u] || 0), 0);
   assert.equal(sum, 3_000_000, "chips are only ever moved, never made");
 });
+
+test("crash: bets, cash out, auto, bust", async () => {
+  const C = await import("../src/crash.js");
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  for (const u of ["a", "b", "x"]) c.handle(u, "", "join", { name: u }, 0);
+  let now = 1000;
+  nc(() => c.handle("a", "", "crCash", {}, now), /まだ/);
+  c.handle("a", "", "crBet", { amount: 1000 }, now);
+  c.handle("b", "", "crBet", { amount: 1000, auto: 1.5 }, now);
+  c.handle("x", "", "crBet", { amount: 1000 }, now);
+  nc(() => c.handle("x", "", "crBet", { amount: 1000, auto: 0.5 }, now), /1.01/);
+  now += C.CR.BET_MS; c.step(now);
+  assert.equal(c.d.cr.phase, "flying"); assert.equal(c.view("cr").bust, null, "bust point stays secret"); assert.equal(c.view("cr").bustAt, undefined); assert.equal(c.fullState().cr.bustAt, undefined);
+  c.d.crSecret.bust = 3; c.d.cr.bustAt = c.d.cr.startAt + C.msFor(3); // fix the flight for the test
+  const t2 = c.d.cr.startAt + C.msFor(2);
+  const r = c.handle("a", "", "crCash", {}, t2);
+  assert.ok(r.out >= 1.99 && r.out <= 2.01); assert.equal(c.d.players.a.chips, 9000 + r.won);
+  nc(() => c.handle("a", "", "crCash", {}, t2), /もう降りて/);
+  c.step(c.d.cr.bustAt);
+  assert.equal(c.d.cr.phase, "bust"); assert.equal(c.d.cr.bust, 3);
+  assert.equal(c.d.players.b.chips, 9000 + 1500, "auto cash-out at 1.5x");
+  assert.equal(c.d.players.x.chips, 9000, "rode it into the ground");
+  nc(() => c.handle("x", "", "crCash", {}, c.d.cr.bustAt + 1), /まだ飛んでない|間に合わ/);
+  // the bust distribution pays back about 96%
+  let s = 0; const N = 200000; for (let i = 0; i < N; i++) s += C.drawBust() >= 2 ? 2 : 0;
+  assert.ok(Math.abs(s / N - 0.96) < 0.02, "payback at 2x " + s / N);
+});

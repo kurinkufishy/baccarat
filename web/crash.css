@@ -1,0 +1,24 @@
+.stage.crash{aspect-ratio:16/7.6;background:radial-gradient(90% 120% at 20% 100%,#1b2a4a 0%,#0e1424 55%,#070a12 100%)}
+@media (max-width:640px){.stage.crash{aspect-ratio:1/1}}
+#graph .gl{stroke:rgba(255,255,255,.06)}#graph .gt{fill:#7d8794;font-size:11px}
+#graph .curve{fill:none;stroke:#22d36b;stroke-width:3;stroke-linejoin:round}#graph .curve.b{stroke:#ff5c6c}
+#graph .area{fill:rgba(34,211,107,.14)}#graph .area.b{fill:rgba(255,92,108,.14)}
+#graph .rocket{font-size:26px}#graph .boom{font-size:40px}
+#graph .off{fill:#ffd76a;stroke:#1b1406;stroke-width:1.5}#graph .offt{fill:#ffd76a;font-size:10px;font-weight:800;paint-order:stroke;stroke:#070a12;stroke-width:3px}
+.mult{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);z-index:4;text-align:center;pointer-events:none}
+.mult .big{font-size:clamp(44px,9vw,88px);font-weight:900;line-height:1;text-shadow:0 4px 20px rgba(0,0,0,.6)}
+.mult .big.up{color:#22d36b}.mult .big.dn,.mult .sub.dn{color:#ff5c6c}
+.mult .sub{font-size:14px;font-weight:800;color:var(--muted)}
+.mult .msg{background:rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:8px 18px;font-weight:800}
+.hist{position:absolute;left:12px;right:12px;bottom:8px;z-index:4;display:flex;gap:5px;overflow:hidden;justify-content:flex-end}
+.hp{flex:none;font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;background:rgba(255,92,108,.18);color:#ff8a94}
+.hp.mid{background:rgba(34,211,107,.16);color:#5be39a}.hp.hi{background:rgba(255,215,106,.2);color:#ffd76a}
+.cashout{width:100%;border:0;border-radius:12px;padding:16px;background:linear-gradient(180deg,#ffd76a,#e0a632);color:#1b1406;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;animation:cashpulse .8s ease-in-out infinite alternate}
+.cashout span{font-weight:900;font-size:18px}.cashout b{font-size:24px}.cashout small{font-size:12px;font-weight:800}
+@keyframes cashpulse{to{box-shadow:0 0 0 4px rgba(255,215,106,.35)}}
+.autos{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.autos .lev{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:7px 0;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+.autos .lev.on{background:var(--gold);color:#1b1406;border-color:var(--gold)}
+#crpanel{display:flex;flex-direction:column;gap:8px}
+.done{font-size:18px;font-weight:900;text-align:center;padding:14px}.up{color:var(--go)}.dn{color:#ff7a84}
+.ordinfo b{font-size:18px}

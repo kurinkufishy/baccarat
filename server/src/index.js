@@ -9,7 +9,7 @@ import { GRANTS } from "./grants.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets", "hlOpen", "bank", "spBets", "pkSit", "pkTopUp", "pkLeave", "pkBack", "pkAct"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets", "hlOpen", "bank", "spBets", "pkSit", "pkTopUp", "pkLeave", "pkBack", "pkAct", "crBet", "crCancel", "crCash"]);
 const FX_WATCH_MS = 60_000; // a page counts as watching the FX market for this long after its last fxWatch
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -51,7 +51,7 @@ export class Casino extends DurableObject {
       else d[k] = v;
     }
     const core = new Core(null, { allowedEmails: csv(this.env.ALLOWED_EMAILS) });
-    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat", "fx", "rc", "rcBets", "sp", "spBets", "pk", "pkDeck"]) if (d[k] !== undefined) core.d[k] = d[k];
+    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat", "fx", "rc", "rcBets", "sp", "spBets", "pk", "pkDeck", "cr", "crBets", "crSecret"]) if (d[k] !== undefined) core.d[k] = d[k];
     core.d.players = d.players;
     this.core = core;
     core.applyGrants(GRANTS, Date.now());
@@ -72,7 +72,7 @@ export class Casino extends DurableObject {
       await this.ctx.storage.put(entries);
       const msgs = [];
       for (const k of ch) {
-        if (k === "bacShoe" || k === "bjShoe" || k === "pkDeck") continue; // never leaves the server
+        if (k === "bacShoe" || k === "bjShoe" || k === "pkDeck" || k === "crSecret") continue; // never leaves the server
         if (k.startsWith("p:")) msgs.push({ type: "player", uid: k.slice(2), p: this.core.view(k) });
         else msgs.push({ type: k, v: this.core.view(k) });
       }

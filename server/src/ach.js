@@ -40,6 +40,10 @@ export const ACH = [
   { id: "fxliq", tier: 1, name: "強制ロスカット", desc: "ロスカットされる", secret: true },
   { id: "fx100", tier: 2, name: "トレーダー", desc: "FXで100回決済する" },
   { id: "fxshort", tier: 2, name: "空売りの達人", desc: "売りで合計10回勝つ" },
+  { id: "cr1", tier: 1, name: "テイクオフ", desc: "クラッシュに乗る" },
+  { id: "crgreedy", tier: 1, name: "欲張り", desc: "10倍をこえても降りずに爆発する", secret: true },
+  { id: "cr10x", tier: 2, name: "10倍で脱出", desc: "クラッシュで10倍以上で降りる" },
+  { id: "cr100x", tier: 3, name: "成層圏", desc: "クラッシュで100倍以上で降りる" },
   { id: "pk1", tier: 1, name: "ポーカーデビュー", desc: "ポーカーで1ハンド遊ぶ" },
   { id: "pkallin", tier: 1, name: "勝負師", desc: "オールインしてショーダウンで勝つ" },
   { id: "pkbig", tier: 2, name: "ビッグポット", desc: "ビッグブラインド100倍以上のポットを取る" },
@@ -116,7 +120,7 @@ export function checkTotals(p, now) {
   on((p.dep || 0) >= 1e9, "debt1b"); on((p.dep || 0) >= 1e11, "debt100b");
   on(p.chips >= 1e10, "rich10b");
   on(st.n >= 1 && bj.n >= 1, "both"); on(bj.n >= 500, "bj500");
-  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0) + ((p.rcst && p.rcst.wag) || 0) + ((p.hlst && p.hlst.wag) || 0) + ((p.spst && p.spst.wag) || 0) + ((p.pkst && p.pkst.wag) || 0);
+  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0) + ((p.rcst && p.rcst.wag) || 0) + ((p.hlst && p.hlst.wag) || 0) + ((p.spst && p.spst.wag) || 0) + ((p.pkst && p.pkst.wag) || 0) + ((p.crst && p.crst.wag) || 0);
   on(wag >= 1e9, "wager1b"); on(wag >= 1e12, "wager1t");
   on(Object.keys(p.ach || {}).filter((id) => id !== "collector" && IDS.has(id)).length >= 30, "collector");
 }
