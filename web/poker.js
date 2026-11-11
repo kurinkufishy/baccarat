@@ -4,6 +4,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
+import { setupDuelWatch } from "./duelwatch.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
@@ -212,6 +213,7 @@ function render() {
 setupGames("poker");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
+const duelw = setupDuelWatch({ call, errMsg, getMe: () => me, getPlayers: () => players, here: false });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => false });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
@@ -266,12 +268,13 @@ function applyBatch(msgs) {
     if (m.type === "pk") { const prev = H() && H().id, prevTurn = H() && H().toAct; pk = m.v; if (H() && H().id !== prev) raiseTo = 0; if (H() && H().toAct === me && prevTurn !== me) { raiseTo = 0; flash("あなたの番！"); } }
     else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
     else if (m.type === "chat") chat.set(m.v);
+    else if (m.type === "duels") duelw.set(m.v);
     else if (m.type === "notice") flash(m.text);
   }
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
+  me = uid; chat.set(st.chat); duelw.set(st.duels, true); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
   players = st.players || {}; pk = st.pk || null; mine = null; mineFor = 0;
   gate = players[me] ? "in" : "join";
   render();

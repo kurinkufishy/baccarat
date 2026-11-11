@@ -4,6 +4,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
+import { setupDuelWatch } from "./duelwatch.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
@@ -215,6 +216,7 @@ $("mid").addEventListener("click", (e) => {
 setupGames("keiba");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
+const duelw = setupDuelWatch({ call, errMsg, getMe: () => me, getPlayers: () => players, here: false });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => rc && rc.phase === "racing" });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
@@ -270,12 +272,13 @@ function applyBatch(msgs) {
     else if (m.type === "rcBets") rcBets = m.v || {};
     else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
     else if (m.type === "chat") chat.set(m.v);
+    else if (m.type === "duels") duelw.set(m.v);
     else if (m.type === "notice") flash(m.text);
   }
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
+  me = uid; chat.set(st.chat); duelw.set(st.duels, true); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
   players = st.players || {}; rc = st.rc || null; rcBets = st.rcBets || {}; want = null;
   gate = players[me] ? "in" : "join";
   render();

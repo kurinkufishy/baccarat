@@ -4,6 +4,7 @@ import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { setupWallet } from "./wallet.js";
 import { setupChat } from "./chat.js";
+import { setupDuelWatch } from "./duelwatch.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
 import { avatar } from "./avatar.js";
@@ -132,6 +133,7 @@ $("inbox").addEventListener("click", (e) => {
 setupGames("duel");
 const wallet = setupWallet({ call, errMsg, flash, fmt, esc, getMe: () => me, getPlayers: () => players, myFree });
 const chat = setupChat({ call, errMsg, esc, getMe: () => me, getPlayers: () => players });
+const duelw = setupDuelWatch({ call, errMsg, getMe: () => me, getPlayers: () => players, here: true });
 const ach = setupAch({ call, errMsg, flash, esc, fmt, getMe: () => me, getPlayers: () => players, busy: () => false });
 const rename = setupRename({ call, errMsg, flash, fmt, getMe: () => me, getPlayers: () => players, myFree });
 document.querySelectorAll(".overlay").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) o.hidden = true; }));
@@ -183,7 +185,7 @@ $("gatebox").addEventListener("click", async (e) => {
 /* ================= realtime ================= */
 function applyBatch(msgs) {
   for (const m of msgs) {
-    if (m.type === "duels") { const before = new Set(duels.filter((x) => x.status === "pending" && x.to === me).map((x) => x.id)); duels = m.v || []; if (duels.some((x) => x.status === "pending" && x.to === me && !before.has(x.id))) flash("対戦が届いたよ！"); }
+    if (m.type === "duels") { const before = new Set(duels.filter((x) => x.status === "pending" && x.to === me).map((x) => x.id)); duels = m.v || []; if (duels.some((x) => x.status === "pending" && x.to === me && !before.has(x.id))) flash("対戦が届いたよ！"); duelw.set(m.v); }
     else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
     else if (m.type === "chat") chat.set(m.v);
     else if (m.type === "notice") flash(m.text);
@@ -191,7 +193,7 @@ function applyBatch(msgs) {
   render();
 }
 function onReady(st, uid) {
-  me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
+  me = uid; chat.set(st.chat); duelw.set(st.duels, true); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset();
   players = st.players || {}; duels = st.duels || []; const d0 = duels.find((x) => x.status === "done"); shown = d0 ? d0.id : 0;
   gate = players[me] ? "in" : "join";
   render();

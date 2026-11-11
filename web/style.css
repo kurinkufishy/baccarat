@@ -423,3 +423,17 @@ a.gcard:hover,a.gcard:focus-visible{border-color:var(--gold);background:color-mi
 .bankbtns .go{padding:12px}
 .bankbtns .go.alt{background:#2c333d;color:var(--text);border:1px solid var(--line)}
 .bankbtns .ib{justify-content:center;height:36px}
+
+/* ---------- duel alerts (every page) ---------- */
+.dwatch{position:fixed;right:14px;top:calc(64px + env(safe-area-inset-top,0px));z-index:70;display:flex;flex-direction:column;gap:8px;width:min(340px,calc(100vw - 28px));pointer-events:none}
+.dcard{pointer-events:auto;background:rgba(18,14,26,.97);border:1px solid #f2c14e;border-radius:12px;padding:10px 12px;box-shadow:0 14px 36px rgba(0,0,0,.6),0 0 0 3px rgba(242,193,78,.18);display:flex;flex-direction:column;gap:6px;animation:dcin .35s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes dcin{from{opacity:0;transform:translateX(30px)}}
+.dcard .dt{font-weight:900;font-size:14px;color:#ffd76a}
+.dcard .dm{font-size:13px;line-height:1.5}
+.dcard .db{display:flex;gap:6px;align-items:center}
+.dcard .db .go{padding:8px 16px;border-radius:8px}
+.dcard .db .ib{height:34px;text-decoration:none}
+.dcard .db .x{margin-left:auto}
+.dcard.res{border-color:var(--line)}.dcard.res.win{border-color:var(--go)}.dcard.res.win .dt{color:var(--go)}.dcard.res.lose .dt{color:#ff7a84}
+@media (max-width:640px){.dwatch{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));right:10px}}
+@media (prefers-reduced-motion:reduce){.dcard{animation:none}}
