@@ -437,3 +437,14 @@ a.gcard:hover,a.gcard:focus-visible{border-color:var(--gold);background:color-mi
 .dcard.res{border-color:var(--line)}.dcard.res.win{border-color:var(--go)}.dcard.res.win .dt{color:var(--go)}.dcard.res.lose .dt{color:#ff7a84}
 @media (max-width:640px){.dwatch{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));right:10px}}
 @media (prefers-reduced-motion:reduce){.dcard{animation:none}}
+
+/* ---------- chat mentions ---------- */
+.cform{position:relative}
+.csug{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:#151a21;border:1px solid var(--line);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:2px;box-shadow:0 10px 26px rgba(0,0,0,.5);z-index:5;max-height:220px;overflow:auto}
+.csug .sg{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);font:inherit;font-size:13px;font-weight:700;padding:7px 8px;border-radius:7px;text-align:left;cursor:pointer}
+.csug .sg.on,.csug .sg:hover{background:color-mix(in srgb,var(--gold) 16%,transparent)}
+.mention{color:#7cc4ff;font-weight:800}
+.mention.me{color:#1b1406;background:var(--gold);border-radius:4px;padding:0 3px}
+.cm.atme .ct{box-shadow:0 0 0 2px var(--gold)}
+.tk.atme{border:1px solid var(--gold)}
+.cbadge.at{background:var(--gold);color:#1b1406}
