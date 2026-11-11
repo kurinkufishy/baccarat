@@ -25,7 +25,7 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
     results = results.filter((r) => now - r.at < 9000);
     // Only the browser pop-up asks about a duel now; this corner just shows errors (e.g. "too late").
     box.innerHTML = ""
-      + results.map((r) => `<div class="dcard res ${r.win ? "win" : "lose"}"><div class="dt">${r.win ? "🏆 タイマン勝利！" : "💀 タイマン敗北…"}</div><div class="dm">${esc(r.text)}</div></div>`).join("");
+      + results.map((r) => `<div class="dcard res ${r.win ? "win" : "lose"}"><div class="dt">⚔️ タイマン</div><div class="dm">${esc(r.text)}</div></div>`).join("");
     document.title = inc.length ? `(${inc.length}) 対戦が届いた！ - ${baseTitle}` : baseTitle;
     void me;
   }
