@@ -31,9 +31,9 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     if (tab === "help") return `${tn} の借金を ${fmt(p)} 肩代わり`;
     return `${tn} に ${fmt(p)} あげる`;
   };
-  const packs = (list) => `<div class="packs">${list.map(([v, l]) => `<button class="pack num ${v === pick ? "on" : ""}" data-v="${v}" ${v > 0 ? "" : "disabled"}>${l || fmt(v)}</button>`).join("")}</div>`;
+  const packs = (list) => `<div class="packs">${list.map(([v, l]) => `<button class="pack num" data-v="${v}" ${v > 0 ? "" : "disabled"}>${l || fmt(v)}</button>`).join("")}</div>`;
   const payPacks = (m) => packs([...[1000, 10000, 50000].filter((v) => v < m).map((v) => [v]), [m, "全額 " + fmt(m)]]);
-  const amountBox = (label) => `<div><label class="flab" for="wamt">${label}</label><div class="amtrow"><input id="wamt" inputmode="numeric" class="num" placeholder="金額を入れる" autocomplete="off" value="${pick && ![1000, 10000, 50000, 100000, 1000000, 10000000].includes(pick) ? pick : ""}"></div></div>`;
+  const amountBox = (label) => `<div><label class="flab" for="wamt">${label}</label><div class="amtrow"><input id="wamt" inputmode="numeric" class="num" placeholder="金額を入れる" autocomplete="off"></div></div>`;
 
   function ensureTarget() {
     const ds = list();
@@ -83,7 +83,14 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
       }
     }
     const key = tab + "|" + h;
-    if ($("wbody").dataset.k !== key) { $("wbody").innerHTML = h + (btn ? `<button class="go" id="wgo" style="padding:14px;width:100%;margin-top:4px"></button>` : ""); $("wbody").dataset.k = key; }
+    // The typed amount is kept out of the markup, so typing never rebuilds the form (which would close the phone keyboard).
+    const typing = document.activeElement && document.activeElement.id === "wamt" && tab === $("wbody").dataset.k.split("|")[0];
+    if ($("wbody").dataset.k !== key && !typing) {
+      $("wbody").innerHTML = h + (btn ? `<button class="go" id="wgo" style="padding:14px;width:100%;margin-top:4px"></button>` : ""); $("wbody").dataset.k = key;
+      const inp = $("wamt"), packVals = [...document.querySelectorAll("#wbody .pack")].map((b) => +b.dataset.v);
+      if (inp) inp.value = pick && !packVals.includes(pick) ? pick : "";
+    }
+    document.querySelectorAll("#wbody .pack").forEach((b) => b.classList.toggle("on", +b.dataset.v === pick));
     const g = $("wgo"); if (g) { g.textContent = busy ? "処理中…" : btn; g.disabled = busy || !ok; }
     if (tab === "bank") { const b = bankNow(me()); $("bankbal").textContent = fmt(b); $("bankday").textContent = fmt(Math.floor(b * BANK_RATE)); }
   }
@@ -117,6 +124,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     } catch (er) { flash(errMsg(er)); }
     busy = false; draw();
   });
+  $("wbody").addEventListener("focusout", (e) => { if (e.target.id === "wamt") setTimeout(draw, 0); });
   $("wbody").addEventListener("input", (e) => {
     if (e.target.id !== "wamt") return;
     pick = +String(e.target.value).replace(/[^\d]/g, "") || 0;
