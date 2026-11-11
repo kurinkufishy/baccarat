@@ -40,6 +40,11 @@ export const ACH = [
   { id: "fxliq", tier: 1, name: "強制ロスカット", desc: "ロスカットされる", secret: true },
   { id: "fx100", tier: 2, name: "トレーダー", desc: "FXで100回決済する" },
   { id: "fxshort", tier: 2, name: "空売りの達人", desc: "売りで合計10回勝つ" },
+  { id: "sp1", tier: 1, name: "キックオフ", desc: "スポーツベットで初めて賭ける" },
+  { id: "spdraw", tier: 1, name: "引き分け職人", desc: "引き分けを当てる" },
+  { id: "spupset", tier: 2, name: "番狂わせ", desc: "オッズ5倍以上のチームの勝ちを当てる" },
+  { id: "sp100", tier: 2, name: "サポーター", desc: "スポーツベットで100試合賭ける" },
+  { id: "spgoals", tier: 3, name: "ゴールラッシュ", desc: "7点以上入った試合でオーバーを当てる", secret: true },
   { id: "hl1", tier: 1, name: "ハイロー入門", desc: "ハイローで初めて勝負する" },
   { id: "hlstreak5", tier: 2, name: "未来が見える", desc: "ハイローで5回続けて当てる" },
   { id: "hl100", tier: 2, name: "ハイロー中毒", desc: "ハイローを100回する" },
@@ -78,7 +83,7 @@ export const ACH = [
 // "st.n" = a field path, "-ax.b" = negated (losing streak), "wag" = all chips ever bet, "achn" = achievements unlocked.
 const PROG = {
   bac100: ["st.n", 100], bac1000: ["st.n", 1000], bj100: ["bjst.n", 100], bj500: ["bjst.n", 500],
-  fx100: ["fxst.n", 100], hl100: ["hlst.n", 100], hlstreak5: ["ax.h", 5], bank1t: ["bank", 1e12], rc100: ["rcst.n", 100], pair10: ["ax.pair", 10], tie5: ["ax.tie", 5], bust20: ["ax.bust", 20],
+  fx100: ["fxst.n", 100], sp100: ["spst.n", 100], hl100: ["hlst.n", 100], hlstreak5: ["ax.h", 5], bank1t: ["bank", 1e12], rc100: ["rcst.n", 100], pair10: ["ax.pair", 10], tie5: ["ax.tie", 5], bust20: ["ax.bust", 20],
   chat100: ["ax.chat", 100], fxshort: ["ax.fxs", 10], streak5: ["ax.b", 5], streak10: ["ax.b", 10], lose10: ["-ax.b", 10],
   bjstreak5: ["ax.j", 5], bjstreak10: ["ax.j", 10], rich1b: ["chips", 1e9], rich10b: ["chips", 1e10], rich1t: ["chips", 1e12],
   debt1b: ["dep", 1e9], debt100b: ["dep", 1e11], wager1b: ["wag", 1e9], wager1t: ["wag", 1e12], collector: ["achn", 30],
@@ -105,7 +110,7 @@ export function checkTotals(p, now) {
   on((p.dep || 0) >= 1e9, "debt1b"); on((p.dep || 0) >= 1e11, "debt100b");
   on(p.chips >= 1e10, "rich10b");
   on(st.n >= 1 && bj.n >= 1, "both"); on(bj.n >= 500, "bj500");
-  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0) + ((p.rcst && p.rcst.wag) || 0) + ((p.hlst && p.hlst.wag) || 0);
+  const wag = (st.wag || 0) + (bj.wag || 0) + ((p.fxst && p.fxst.wag) || 0) + ((p.rcst && p.rcst.wag) || 0) + ((p.hlst && p.hlst.wag) || 0) + ((p.spst && p.spst.wag) || 0);
   on(wag >= 1e9, "wager1b"); on(wag >= 1e12, "wager1t");
   on(Object.keys(p.ach || {}).filter((id) => id !== "collector" && IDS.has(id)).length >= 30, "collector");
 }

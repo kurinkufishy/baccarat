@@ -9,7 +9,7 @@ import { GRANTS } from "./grants.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets", "hlOpen", "bank"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets", "hlOpen", "bank", "spBets"]);
 const FX_WATCH_MS = 60_000; // a page counts as watching the FX market for this long after its last fxWatch
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -51,7 +51,7 @@ export class Casino extends DurableObject {
       else d[k] = v;
     }
     const core = new Core(null, { allowedEmails: csv(this.env.ALLOWED_EMAILS) });
-    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat", "fx", "rc", "rcBets"]) if (d[k] !== undefined) core.d[k] = d[k];
+    for (const k of ["bac", "bacBets", "bacShoe", "bj", "bjBets", "bjShoe", "meta", "chat", "fx", "rc", "rcBets", "sp", "spBets"]) if (d[k] !== undefined) core.d[k] = d[k];
     core.d.players = d.players;
     this.core = core;
     core.applyGrants(GRANTS, Date.now());

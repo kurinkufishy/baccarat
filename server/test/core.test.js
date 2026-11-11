@@ -516,3 +516,25 @@ test("High/Low options and the bank", () => {
   assert.equal(a().bank, 5049);
   nc(() => c.handle("a", "", "bank", { op: "withdraw", amount: 999999 }, 86400000), /預金/);
 });
+
+test("virtual football: bet, play, payout", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  let now = 5_000_000; c.step(now);
+  const s = () => c.d.sp;
+  assert.ok(s().match && s().match.odds.h > 1);
+  assert.equal(c.view("sp").match.lh, undefined, "goal rates stay on the server");
+  nc(() => c.handle("a", "", "spBets", { bets: { x: 100 }, round: 1 }, now), /ベット/);
+  c.handle("a", "", "spBets", { bets: { h: 1000, d: 1000, a: 1000, o: 1000, u: 1000, by: 1000, bn: 1000 }, round: 1 }, now);
+  assert.equal(c.d.players.a.chips, 3000);
+  now += 30000; c.step(now); assert.equal(s().phase, "playing");
+  nc(() => c.handle("a", "", "spBets", { bets: {}, round: 1 }, now), /締切/);
+  now = s().endAt; c.step(now); assert.equal(s().phase, "result");
+  const o = s().match.odds, [h, a] = s().score;
+  const expect = 3000 + Math.floor(1000 * o[h > a ? "h" : h === a ? "d" : "a"]) + Math.floor(1000 * o[h + a >= 3 ? "o" : "u"]) + Math.floor(1000 * o[h && a ? "by" : "bn"]);
+  assert.equal(c.d.players.a.chips, expect);
+  assert.equal(s().ev.filter((e) => e.k === "goal").length, h + a);
+  assert.ok(c.d.players.a.ach.sp1);
+  now = s().holdUntil; c.step(now); assert.equal(s().round, 2);
+});

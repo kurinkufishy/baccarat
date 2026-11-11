@@ -6,6 +6,7 @@ import * as B from "./bjgame.js";
 import * as A from "./ach.js";
 import * as F from "./fxgame.js";
 import * as R from "./race.js";
+import * as S from "./sports.js";
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -14,7 +15,8 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {} });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {} });
+export const freshSp = () => ({ round: 1, phase: "paused", closesAt: 0, match: null, startAt: 0, endAt: 0, holdUntil: 0, ev: null, score: null, history: [], idle: 0, hadBets: false });
 export const freshRc = () => ({ round: 1, phase: "paused", closesAt: 0, card: null, startAt: 0, endAt: 0, holdUntil: 0, unit: 0, script: null, res: null, history: [], idle: 0, hadBets: false });
 const RENAME_COST = 1_000_000;
 const BANK_RATE = 0.01; // per day
@@ -55,6 +57,7 @@ export class Core {
       case "rename": return this.rename(uid, m.name, now);
       case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
       case "rcBets": return this.rcSetBets(uid, m.bets, m.round, now);
+      case "spBets": return this.spSetBets(uid, m.bets, m.round, now);
       case "hlOpen": return this.hlOpen(uid, m.dir, m.amount, m.dur, now);
       case "bank": return this.bankOp(uid, m.op, m.amount, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
@@ -402,16 +405,17 @@ export class Core {
   step(now) {
     const did = [];
     for (let i = 0; i < 6; i++) {
-      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now);
+      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now);
       if (a) did.push("bac:" + a);
       if (b) did.push("bj:" + b);
       if (c) did.push("rc:" + c);
-      if (!a && !b && !c) break;
+      if (e) did.push("sp:" + e);
+      if (!a && !b && !c && !e) break;
     }
     return did;
   }
   nextDue() {
-    const ts = [this.bacDue(), this.bjDue(), this.rcDue()].filter((x) => x !== null);
+    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue()].filter((x) => x !== null);
     return ts.length ? Math.min(...ts) : null;
   }
 
@@ -585,6 +589,75 @@ export class Core {
     return null;
   }
 
+  /* ---------------- virtual football ---------------- */
+  spOpen(now) { const s = this.d.sp; return !!s.match && (s.phase === "paused" || (s.phase === "betting" && now < s.closesAt)); }
+  spSetBets(uid, raw, round, now) {
+    let want;
+    try { want = S.cleanBets(raw); } catch (e) { fail(e === "too-small" ? `1点 ${S.SP.MIN_BET} から` : "ベットがおかしいよ"); }
+    const p = this.player(uid), s = this.d.sp;
+    if (!this.spOpen(now)) fail("締切。次の試合を待ってね");
+    if (round !== s.round) fail("試合が進んだので、もう一度賭けてね");
+    const cur = this.d.spBets[uid] && this.d.spBets[uid].round === s.round ? this.d.spBets[uid].bets : {};
+    const delta = S.sumBets(want) - S.sumBets(cur);
+    if (delta > p.chips) fail("チップが足りない。残高の＋から借りられるよ");
+    p.chips -= delta;
+    if (S.sumBets(want) > 0) this.d.spBets[uid] = { round: s.round, bets: want, total: S.sumBets(want), at: now };
+    else delete this.d.spBets[uid];
+    if (s.phase === "paused" && S.sumBets(want) > 0) { s.phase = "betting"; s.closesAt = now + S.SP.BET_MS; s.idle = 0; this.mark("sp"); }
+    this.mark("p:" + uid, "spBets");
+  }
+  spStep(now) {
+    const s = this.d.sp || (this.d.sp = freshSp());
+    if (!s.match) { s.match = S.newMatch(s.round, now); this.mark("sp"); return "card"; }
+    if (s.phase === "betting" && now >= s.closesAt) {
+      const g = S.play(s.match);
+      Object.assign(s, { phase: "playing", startAt: now + 2000, endAt: now + 2000 + S.SP.PLAY_MS, ev: g.ev, score: g.score,
+        hadBets: Object.values(this.d.spBets).some((b) => b.round === s.round && b.total > 0) });
+      this.mark("sp");
+      return "kickoff";
+    }
+    if (s.phase === "playing" && now >= s.endAt) {
+      const odds = s.match.odds, win = S.winners(s.score);
+      for (const [uid, bd] of Object.entries(this.d.spBets)) {
+        delete this.d.spBets[uid];
+        const p = this.d.players[uid];
+        if (!p || bd.round !== s.round || !bd.total) continue;
+        const ret = S.payout(bd.bets, odds, s.score), d = ret - bd.total;
+        const st = p.spst || freshStats();
+        st.n++; st.wag += bd.total; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+        Object.assign(p, { chips: Math.min(p.chips + ret, G.MAX_CHIPS), spst: st, spLast: { round: s.round, d, ret, stake: bd.total },
+          spcurve: [...(p.spcurve || []), st.prof].slice(-300) });
+        A.checkResult(p, d, false, now);
+        A.unlock(p, "sp1", now);
+        if (st.n >= 100) A.unlock(p, "sp100", now);
+        if (bd.bets.d && win.has("d")) A.unlock(p, "spdraw", now);
+        const res = win.has("h") ? "h" : win.has("a") ? "a" : "d";
+        if (bd.bets[res] && odds[res] >= 5) A.unlock(p, "spupset", now);
+        if (s.score[0] + s.score[1] >= 7 && bd.bets.o) A.unlock(p, "spgoals", now);
+        this.mark("p:" + uid);
+      }
+      s.history = [...(s.history || []), { r: s.round, home: s.match.home.name, away: s.match.away.name, score: s.score }].slice(-20);
+      Object.assign(s, { phase: "result", holdUntil: now + S.SP.HOLD_MS });
+      this.mark("sp", "spBets");
+      return "fulltime";
+    }
+    if (s.phase === "result" && now >= s.holdUntil) {
+      const idle = s.hadBets ? 0 : (s.idle || 0) + 1, paused = idle >= S.SP.IDLE_LIMIT, round = (s.round || 1) + 1;
+      Object.assign(s, { round, match: S.newMatch(round, now), ev: null, score: null, startAt: 0, endAt: 0, idle, phase: paused ? "paused" : "betting", closesAt: paused ? 0 : now + S.SP.BET_MS });
+      this.mark("sp");
+      return "next";
+    }
+    return null;
+  }
+  spDue() {
+    const s = this.d.sp;
+    if (!s || !s.match) return 0;
+    if (s.phase === "betting") return s.closesAt;
+    if (s.phase === "playing") return s.endAt;
+    if (s.phase === "result") return s.holdUntil;
+    return null;
+  }
+
   /* ---------------- FX ---------------- */
   /** Move the market one tick and stop out anyone whose position has lost its whole margin. */
   fxTick(now) {
@@ -717,12 +790,14 @@ export class Core {
     if (key === "bjBets") return d.bjBets;
     if (key === "rc") { const r = d.rc; return { ...r, card: r.card && { round: r.card.round, horses: r.card.horses.map(({ s, e, ...h }) => h) } }; }
     if (key === "rcBets") return d.rcBets;
+    if (key === "sp") { const s = d.sp; return { ...s, match: s.match && { round: s.match.round, home: s.match.home, away: s.match.away, odds: s.match.odds } }; }
+    if (key === "spBets") return d.spBets;
     if (key === "meta") return { imported: !!d.meta.imported };
     if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }

@@ -1,0 +1,41 @@
+/* Virtual football (shares the panel styles in keiba.css) */
+.stage.sports{aspect-ratio:16/8.4;background:#0b3d1c}
+@media (max-width:640px){.stage.sports{aspect-ratio:1/0.95}}
+.pitch{position:absolute;left:3%;right:3%;top:17%;bottom:5%;border-radius:6px;background:repeating-linear-gradient(90deg,#2f8f3f 0 7.14%,#38a24a 7.14% 14.28%);box-shadow:0 10px 30px rgba(0,0,0,.35) inset;overflow:hidden}
+.pitch .lines{position:absolute;inset:0;width:100%;height:100%}
+.men{position:absolute;inset:0}
+.man{position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;background:var(--c1);border:2px solid var(--c2);box-shadow:0 2px 3px rgba(0,0,0,.35);transition:transform .25s linear}
+.ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d9d9d9 60%,#9a9a9a);box-shadow:0 2px 4px rgba(0,0,0,.45);z-index:2}
+.board{position:absolute;left:50%;top:46px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;background:rgba(8,10,14,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;white-space:nowrap;max-width:94%}
+.board .tm{display:flex;align-items:center;gap:6px;font-weight:800;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.tm i{width:12px;height:12px;border-radius:3px;border:2px solid;flex:none}
+.board .sc{font-size:24px;font-weight:900;letter-spacing:.04em}.board .sc em{font-style:normal;margin:0 3px;opacity:.6}
+.board .clk{font-size:12px;font-weight:800;color:var(--gold);min-width:56px;text-align:center}
+@media (max-width:640px){.board{top:76px;gap:6px;padding:5px 8px}.board .tm{font-size:11px;max-width:96px}.board .sc{font-size:19px}}
+.goalban{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:6;display:flex;flex-direction:column;align-items:center;gap:2px;background:linear-gradient(135deg,var(--c,#1f6fe0),rgba(0,0,0,.85));border:2px solid #fff;border-radius:14px;padding:10px 26px;animation:goalpop .4s cubic-bezier(.2,.9,.3,1.4)}
+.goalban b{font-size:clamp(28px,6vw,52px);font-weight:900;letter-spacing:.06em;text-shadow:0 3px 12px rgba(0,0,0,.5)}
+.goalban span{font-weight:800;font-size:14px}
+@keyframes goalpop{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
+.sports #pill{top:auto;bottom:12px}
+.pill.msg.won{border-color:var(--go)}
+#markets{display:flex;flex-direction:column;gap:10px}
+.match{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
+.match .tm{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:14px;text-align:center}
+.match .tm small{font-size:10px;color:var(--muted);font-weight:600}
+.match .vs{color:var(--muted);font-size:12px}
+.mg{display:flex;flex-direction:column;gap:5px}
+.mgh{font-size:12px;font-weight:800;color:var(--muted)}
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}.mrow.three{grid-template-columns:1fr 1fr 1fr}
+.mk{position:relative;background:#262c35;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:inherit;min-width:0}
+.mk span{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.mk b{font-size:17px}
+.mk.has{border-color:var(--go);background:color-mix(in srgb,var(--go) 16%,#262c35)}
+.mk.won{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.mk i{position:absolute;top:-7px;right:-4px;font-style:normal;font-size:9px;font-weight:900;background:var(--go);color:#062312;border-radius:999px;padding:1px 5px}
+.mk:disabled{cursor:default;opacity:.65}.mk.won:disabled{opacity:1}
+.mk:not(:disabled):hover{border-color:var(--gold)}
+.ev{display:flex;align-items:center;gap:6px;font-size:12px}
+.ev .m{width:28px;color:var(--muted);font-weight:700}
+.ev i{width:8px;height:8px;border-radius:2px;flex:none}
+.ev.goal{font-weight:800}.ev.chance{color:var(--muted)}
+.hrow .hn2.r{text-align:right}
