@@ -41,6 +41,26 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
   });
   setInterval(draw, 1000);
 
+  // The browser's own pop-up (the same box as alert/confirm): OK takes the duel on the spot.
+  const ask = [];
+  let asking = false;
+  async function popup() {
+    if (asking) return;
+    const x = ask.shift(); if (!x) return;
+    const cur = duels.find((d) => d.id === x.id);
+    if (!cur || cur.status !== "pending" || cur.expAt <= Date.now()) { popup(); return; }
+    asking = true;
+    const ok = window.confirm(`⚔️ ${name(x.from)} から対戦の申し込み！\n\n${x.game === "coin" ? "🪙 コイントス" : "🎲 ダイス"}・${fmt(x.stake)} チップ\n\nOK で受けて勝負する（キャンセルならあとで決められる）`);
+    asking = false;
+    if (ok) {
+      busy = x.id; draw();
+      try { await call("duelAnswer", { duel: x.id, accept: true }); }
+      catch (er) { results.push({ at: Date.now(), win: false, text: errMsg(er) }); }
+      busy = 0; draw();
+    }
+    if (ask.length) setTimeout(popup, 300);
+  }
+
   return {
     /** Feed the latest duel list. first = initial state (no alerts for things that already happened). */
     set(list, first) {
@@ -51,7 +71,7 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
       for (const x of duels) {
         const k = x.id + ":" + x.status;
         if (known.has(k)) continue;
-        if (x.status === "pending" && x.to === me) beep();
+        if (x.status === "pending" && x.to === me) { beep(); ask.push(x); }
         if (x.status === "done" && (x.from === me || x.to === me)) {
           const win = x.winner === me, other = x.from === me ? x.to : x.from;
           results.push({ at: Date.now(), win, text: `${name(other)} との${x.game === "coin" ? "コイントス" : "ダイス"}（${fmt(x.stake)}）${win ? `に勝って +${fmt(x.stake)}` : `に負けて -${fmt(x.stake)}`}` });
@@ -60,6 +80,7 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
       }
       known = ids;
       draw();
+      if (ask.length) setTimeout(popup, 50);
     },
   };
 }
