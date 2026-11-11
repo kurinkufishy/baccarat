@@ -23,6 +23,15 @@ const u01 = () => (randomInt(0x40000000) + 0.5) / 0x40000000;
 const gauss = () => Math.sqrt(-2 * Math.log(u01())) * Math.cos(2 * Math.PI * u01());
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
+// High/Low (binary options, like "HighLow Australia" turbo): will the price be higher or lower than now after N seconds?
+// Win pays stake x rate; the same price at expiry counts as a loss, like the real thing.
+export const HL = {
+  DURS: { 30: 2.0, 60: 1.95, 180: 1.9, 300: 1.88 }, // seconds -> payout rate
+  MAX_OPEN: 10,
+  MIN: 100,
+  MAX: 100_000_000_000_000,
+};
+
 export const freshFx = () => ({ price: FX.START, lastAt: 0, ticks: [], candles: [] });
 
 export function nextPrice(p) {

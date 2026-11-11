@@ -21,7 +21,8 @@
 .pos{color:var(--go)}.neg{color:#ff7a84}
 .dhead{display:flex;gap:12px;align-items:center}
 .dhead h2{font-size:20px}
-.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:560px){.nums{grid-template-columns:repeat(2,1fr)}}
 .nums div{background:var(--panel2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .nums span{font-size:11px;color:var(--muted)}.nums b{font-size:15px;overflow:hidden;text-overflow:ellipsis}.nums small{font-size:11px;color:var(--muted)}
 .grp{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px}

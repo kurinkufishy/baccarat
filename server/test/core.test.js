@@ -487,3 +487,32 @@ test("admin operations", () => {
   assert.equal(log.length, 8); assert.equal(log[0].by, "運営"); assert.match(log[0].what, /北村さん/);
   assert.deepEqual(c.view("meta"), { imported: false }, "the admin log is not broadcast");
 });
+
+test("High/Low options and the bank", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  c.handle("a", "", "join", { name: "あ" }, 0);
+  const a = () => c.d.players.a;
+  nc(() => c.handle("a", "", "hlOpen", { dir: "high", amount: 1000, dur: 30 }, 1000), /止まって/);
+  c.fxTick(1000);
+  nc(() => c.handle("a", "", "hlOpen", { dir: "up", amount: 1000, dur: 30 }, 1500), /HIGH/);
+  nc(() => c.handle("a", "", "hlOpen", { dir: "high", amount: 1000, dur: 45 }, 1500), /時間/);
+  c.handle("a", "", "hlOpen", { dir: "high", amount: 1000, dur: 30 }, 1500);
+  c.handle("a", "", "hlOpen", { dir: "low", amount: 1000, dur: 30 }, 1500);
+  assert.equal(a().chips, 8000); assert.ok(c.hlPending());
+  const entry = a().hl[0].entry;
+  c.d.fx.price = entry; // force a known move: whatever the next tick does, exactly one of high/low wins unless it's flat
+  c.fxTick(20_000); assert.equal(a().hl.length, 2, "not due yet");
+  c.fxTick(31_500);
+  assert.equal(a().hl.length, 0); assert.ok(!c.hlPending());
+  const last = c.d.fx.price;
+  assert.equal(a().chips, last === entry ? 8000 : 8000 + 2000, "one side wins x2.0, a flat price loses both");
+  assert.equal(a().hlst.n, 2); assert.ok(a().ach.hl1);
+  // bank
+  nc(() => c.handle("a", "", "bank", { op: "deposit", amount: 1e9 }, 0), /足りない/);
+  c.handle("a", "", "bank", { op: "deposit", amount: 5000 }, 100);
+  assert.equal(a().bank, 5000); assert.ok(a().ach.bank1);
+  c.handle("a", "", "bank", { op: "withdraw", amount: 1 }, 86400100); // one day later: 1% interest added first
+  assert.equal(a().bank, 5049);
+  nc(() => c.handle("a", "", "bank", { op: "withdraw", amount: 999999 }, 86400000), /預金/);
+});

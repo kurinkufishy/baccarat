@@ -5,13 +5,14 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAut
 import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
 import { avatar } from "./avatar.js";
+import { bankNow } from "./wallet.js";
 
 const START = 10000;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 const fmt = (n) => Number(n || 0).toLocaleString("ja-JP");
 const short = (n) => { const a = Math.abs(n), s = n < 0 ? "-" : ""; return s + (a >= 1e12 ? (+(a / 1e12).toFixed(2)) + "兆" : a >= 1e8 ? (+(a / 1e8).toFixed(2)) + "億" : a >= 1e4 ? (+(a / 1e4).toFixed(1)) + "万" : String(a)); };
-const netOf = (p) => p.chips - (p.dep || 0) - START;
+const netOf = (p) => p.chips + bankNow(p) - (p.dep || 0) - START;
 
 /** "1兆", "500億", "10B", "-1.5M", "12,345" → integer, or null. */
 function parseAmount(s) {
@@ -57,7 +58,7 @@ function renderDetail() {
   $("detail").dataset.u = sel;
   $("detail").innerHTML = `
     <div class="dhead">${avatar(p, esc, p.frame, "big")}<div><h2>${esc(p.name)}</h2><span class="mut small">ID ${esc(sel)}</span></div></div>
-    <div class="nums"><div><span>残高</span><b class="num">${fmt(p.chips)}</b><small>${short(p.chips)}</small></div><div><span>借金</span><b class="num neg">${fmt(p.dep || 0)}</b><small>${short(p.dep || 0)}</small></div><div><span>収支</span><b class="num ${netOf(p) >= 0 ? "pos" : "neg"}">${fmt(netOf(p))}</b><small>${short(netOf(p))}</small></div></div>
+    <div class="nums"><div><span>残高</span><b class="num">${fmt(p.chips)}</b><small>${short(p.chips)}</small></div><div><span>預金</span><b class="num">${fmt(bankNow(p))}</b><small>${short(bankNow(p))}</small></div><div><span>借金</span><b class="num neg">${fmt(p.dep || 0)}</b><small>${short(p.dep || 0)}</small></div><div><span>収支</span><b class="num ${netOf(p) >= 0 ? "pos" : "neg"}">${fmt(netOf(p))}</b><small>${short(netOf(p))}</small></div></div>
     <div class="grp"><label for="amt">金額 <span class="mut small">（例: 1兆、500億、10B、-10B、12345）</span></label>
       <input id="amt" class="ain num" inputmode="text" autocomplete="off" value="${keepAmt ? esc(amt) : ""}"><div class="parsed" id="parsed"></div>
       <div class="btns">

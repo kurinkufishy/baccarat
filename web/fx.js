@@ -10,6 +10,7 @@ import { avatar } from "./avatar.js";
 import { setupGames } from "./games.js";
 
 /* ================= constants (keep in sync with server/src/fxgame.js) ================= */
+const HL_DURS = { 30: 2.0, 60: 1.95, 180: 1.9, 300: 1.88 }, HL_MAX = 10;
 const SPREAD = 0.006, LEVS = [1, 5, 10, 25, 50, 100], MAX_POS = 5, MIN_MARGIN = 100, KEEP_TICKS = 300, KEEP_CANDLES = 180;
 const CHIPS = [{ v: 100, c: "#3f7fbf", l: "100" }, { v: 1000, c: "#1f9d55", l: "1K" }, { v: 10000, c: "#2b2b33", l: "10K" }, { v: 100000, c: "#c98a12", l: "100K" }, { v: 1000000, c: "#0f8f8a", l: "1M" }, { v: 100000000, c: "#b0306a", l: "100M" }];
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -35,6 +36,7 @@ const errMsg = (e) => (e && e.message ? e.message : "うまくいかなかった
 /* ================= state ================= */
 let user = null, me = null, gate = "loading", gateErr = "", joining = false;
 let players = {}, fx = { price: 150, lastAt: 0, ticks: [], candles: [] }, prevPrice = null;
+let omode = "fx", dur = 60, hlSeen = null;
 let amt = 1000, lev = 10, mode = "tick", busy = false, statsOpen = false, flashMsg = "", flashT = null;
 let myPosIds = new Set();
 
@@ -99,6 +101,12 @@ function drawChart() {
     const g = pnl(pos, fx.price) >= 0;
     h += `<line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" class="en ${pos.side > 0 ? "b" : "s"}"/><text x="${W - right - 6}" y="${y - 5}" class="et ${g ? "up" : "dn"}" text-anchor="end">${pos.side > 0 ? "買" : "売"} ×${pos.lev} ${sgn(pnl(pos, fx.price))}</text>`;
   }
+  // my High/Low options
+  for (const o of (myP()?.hl) || []) {
+    const y = Y(o.entry); if (y < top - 4 || y > top + ch + 4) continue;
+    const secs = Math.max(0, Math.ceil((o.exp - sNow()) / 1000));
+    h += `<line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" class="hlln"/><text x="${W - right - 6}" y="${y + 13}" class="hlt" text-anchor="end">${o.dir > 0 ? "▲HIGH" : "▼LOW"} あと${secs}秒</text>`;
+  }
   // current price tag
   const yp = Y(fx.price), tick = prevPrice === null || fx.price >= prevPrice;
   h += `<line x1="${left}" x2="${W - right}" y1="${yp}" y2="${yp}" class="cur"/><rect x="${W - right + 2}" y="${yp - 10}" width="${right - 4}" height="20" rx="4" class="tag ${tick ? "up" : "dn"}"/><text x="${W - right + 6}" y="${yp + 4}" class="tagt">${p3(fx.price)}</text>`;
@@ -114,7 +122,22 @@ function renderQuote() {
   $("quote").innerHTML = flashMsg ? `<div class="qflash">${esc(flashMsg)}</div>`
     : `<div class="qp num ${up ? "up" : "dn"}">${p3(fx.price)}</div><div class="qc num ${ch >= 0 ? "up" : "dn"}">${ch >= 0 ? "▲" : "▼"} ${Math.abs(ch).toFixed(3)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)<span class="mut"> ${spanTxt()}前比</span></div>${live() && !marketOn() ? '<div class="qstop">相場をつないでます…</div>' : ""}`;
 }
+const durTxt = (s) => (s < 60 ? s + "秒" : s / 60 + "分");
 function renderOrder() {
+  document.querySelectorAll("#otabs button").forEach((b) => b.classList.toggle("on", b.dataset.o === omode));
+  $("levs").hidden = omode !== "fx"; $("durs").hidden = omode !== "hl";
+  if (omode === "hl") {
+    $("durs").innerHTML = Object.entries(HL_DURS).map(([s, r]) => `<button class="lev ${+s === dur ? "on" : ""}" data-d="${s}" role="radio" aria-checked="${+s === dur}">${durTxt(+s)}<small>×${r.toFixed(2)}</small></button>`).join("");
+    const a = Math.min(amt, myFree());
+    $("ordinfo").innerHTML = live() ? `<div><span class="mut">掛け金</span> <b class="num">${fmt(a)}</b></div><div class="mut small">${durTxt(dur)}後に当たると ${fmt(Math.floor(a * HL_DURS[dur]))} 戻る・同じ値段は負け</div>` : "";
+    const can = live() && marketOn() && !busy && a >= 100 && ((myP()?.hl) || []).length < HL_MAX;
+    $("obuy").disabled = !can; $("osell").disabled = !can;
+    $("obuyt").textContent = "▲ HIGH"; $("osellt").textContent = "▼ LOW";
+    $("obuys").textContent = `${durTxt(dur)}後に上`; $("osells").textContent = `${durTxt(dur)}後に下`;
+    $("askp").textContent = p3(fx.price); $("bidp").textContent = p3(fx.price);
+    return;
+  }
+  $("obuyt").textContent = "買い"; $("osellt").textContent = "売り"; $("obuys").textContent = "上がると思う"; $("osells").textContent = "下がると思う";
   $("levs").innerHTML = LEVS.map((l) => `<button class="lev ${l === lev ? "on" : ""}" data-l="${l}" role="radio" aria-checked="${l === lev}">×${l}</button>`).join("");
   const a = Math.min(amt, myFree()), move = Math.floor(a * lev * 0.01);
   $("ordinfo").innerHTML = live() ? `<div><span class="mut">証拠金</span> <b class="num">${fmt(a)}</b></div><div class="mut small">取引額 ${fmtK(a * lev)}・1%動くと ±${fmt(move)}・ロスカットまで ${(100 / lev).toFixed(lev >= 50 ? 1 : 0)}%</div>` : "";
@@ -126,14 +149,19 @@ function posRow(pos, owner, mineRow) {
   const d = pnl(pos, fx.price), pct = (d / pos.margin) * 100, lq = liqPrice(pos), danger = mineRow && pct <= -70;
   return `<div class="prow ${danger ? "danger" : ""}">${owner ? avatar(owner, esc) : ""}<span class="sd ${pos.side > 0 ? "b" : "s"}">${pos.side > 0 ? "買" : "売"}</span><span class="pi"><b>×${pos.lev}</b> <span class="num">${fmtK(pos.margin)}</span><small class="num">${owner ? esc(owner.name) + " · " : ""}${p3(pos.entry)}${mineRow ? ` · <span class="lq">ロスカット ${pos.lev === 1 && pos.side > 0 ? "なし" : p3(lq)}</span>` : ""}</small></span><span class="pl num ${d >= 0 ? "up" : "dn"}">${sgn(d)}<small>${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</small></span>${mineRow ? `<button class="pclose" data-id="${pos.id}" ${busy ? "disabled" : ""}>決済</button>` : ""}</div>`;
 }
+function hlRow(o) {
+  const left = Math.max(0, Math.ceil((o.exp - sNow()) / 1000)), diff = fx.price - o.entry, winning = o.dir * diff > 0;
+  return `<div class="prow hl ${winning ? "win" : "lose"}"><span class="sd ${o.dir > 0 ? "b" : "s"}">${o.dir > 0 ? "▲" : "▼"}</span><span class="pi"><b>${o.dir > 0 ? "HIGH" : "LOW"}</b> <span class="num">${fmtK(o.amount)}</span><small class="num">${p3(o.entry)} → ${p3(fx.price)} · ×${o.rate.toFixed(2)}</small></span><span class="pl num ${winning ? "up" : "dn"}">${winning ? "+" + fmt(Math.floor(o.amount * o.rate) - o.amount) : "-" + fmt(o.amount)}<small>${winning ? "当たり中" : diff === 0 ? "同値（負け）" : "はずれ中"}</small></span><span class="cd num">${left}<small>秒</small></span></div>`;
+}
 function renderPositions() {
+  const hls = (myP()?.hl) || [];
   const mine = (myP()?.fxPos) || [];
   const tot = mine.reduce((s, x) => s + pnl(x, fx.price), 0);
   $("poscount").innerHTML = mine.length ? `${mine.length}/${MAX_POS}・<span class="num ${tot >= 0 ? "up" : "dn"}">${sgn(tot)}</span>` : "";
   $("closeall").hidden = mine.length < 2; $("closeall").disabled = busy;
   const hist = (myP()?.fxhist) || [];
-  $("plist").innerHTML = mine.length ? mine.map((x) => posRow(x, null, true)).join("")
-    : `<div class="empty">ポジションなし。チップで証拠金を決めて、買いか売りを押してね${hist.length ? `<br><span class="small">前回: ${hist[0].liq ? "ロスカット " : ""}<span class="${hist[0].d >= 0 ? "up" : "dn"}">${sgn(hist[0].d)}</span></span>` : ""}</div>`;
+  $("plist").innerHTML = hls.map(hlRow).join("") + (mine.length ? mine.map((x) => posRow(x, null, true)).join("") : hls.length ? "" : "")
+    + (mine.length || hls.length ? "" : `<div class="empty">ポジションなし。チップで証拠金を決めて、買いか売りを押してね${hist.length ? `<br><span class="small">前回: ${hist[0].liq ? "ロスカット " : ""}<span class="${hist[0].d >= 0 ? "up" : "dn"}">${sgn(hist[0].d)}</span></span>` : ""}</div>`);
   const others = [];
   for (const [uid, p] of Object.entries(players)) if (uid !== me) for (const pos of p.fxPos || []) others.push([p, pos]);
   const rank = Object.entries(players).filter(([, p]) => p.fxst && p.fxst.n).sort((a, b) => b[1].fxst.prof - a[1].fxst.prof).slice(0, 8);
@@ -179,6 +207,14 @@ function render() {
 
 /* ================= actions ================= */
 async function order(side) {
+  if (omode === "hl") {
+    const a = Math.min(amt, myFree());
+    if (busy || a < 100) { if (a < 100) flash("掛け金は 100 から"); return; }
+    busy = true; render();
+    try { await call("hlOpen", { dir: side === "buy" ? "high" : "low", amount: a, dur }); flash(`${side === "buy" ? "HIGH" : "LOW"}・${durTxt(dur)}（${fmtK(a)}）`); }
+    catch (e) { flash(errMsg(e)); }
+    busy = false; render(); return;
+  }
   const margin = Math.min(amt, myFree());
   if (busy || margin < MIN_MARGIN) { if (margin < MIN_MARGIN) flash(`証拠金は ${MIN_MARGIN} から`); return; }
   busy = true; render();
@@ -195,6 +231,8 @@ async function close(id) {
 }
 $("obuy").addEventListener("click", () => order("buy"));
 $("osell").addEventListener("click", () => order("sell"));
+$("otabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { omode = b.dataset.o; render(); } });
+$("durs").addEventListener("click", (e) => { const b = e.target.closest(".lev"); if (b) { dur = +b.dataset.d; render(); } });
 $("levs").addEventListener("click", (e) => { const b = e.target.closest(".lev"); if (b) { lev = +b.dataset.l; render(); } });
 $("plist").addEventListener("click", (e) => { const b = e.target.closest(".pclose"); if (b) close(+b.dataset.id); });
 $("closeall").addEventListener("click", () => close("all"));
@@ -276,6 +314,10 @@ function onTick(t, p) {
 }
 function checkStopOut() {
   const p = myP(); if (!p) return;
+  // High/Low results
+  const hh = p.hlhist || [], top = hh[0] ? hh[0].at + ":" + hh.length : "";
+  if (hlSeen !== null && top && top !== hlSeen) { const x = hh[0]; flash(x.d > 0 ? `ハイロー当たり！ +${fmt(x.d)}` : `ハイローはずれ… ${fmt(x.d)}`); }
+  hlSeen = top;
   const ids = new Set((p.fxPos || []).map((x) => x.id));
   const gone = [...myPosIds].filter((id) => !ids.has(id));
   if (gone.length && !busy && p.fxhist && p.fxhist[0] && p.fxhist[0].liq) flash(`ロスカット… ${sgn(p.fxhist[0].d)}`);
@@ -295,6 +337,7 @@ function applyBatch(msgs) {
 function onReady(st, uid) {
   me = uid; chat.set(st.chat); ach.setDefs(st.achDefs, st.frameDefs, st.bubbleDefs); ach.reset(); players = st.players || {}; importAvail = !(st.meta && st.meta.imported);
   myPosIds = new Set(((players[me] && players[me].fxPos) || []).map((x) => x.id));
+  { const hh = (players[me] && players[me].hlhist) || []; hlSeen = hh[0] ? hh[0].at + ":" + hh.length : ""; }
   gate = players[me] ? "in" : "join";
   render(); watch();
 }

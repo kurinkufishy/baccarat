@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { connect } from "./net.js";
-import { setupWallet } from "./wallet.js";
+import { setupWallet, bankNow } from "./wallet.js";
 import { setupChat } from "./chat.js";
 import { setupRename } from "./rename.js";
 import { setupAch } from "./ach.js";
@@ -374,7 +374,7 @@ function renderRoads() {
   $("biggrid").innerHTML = cells.map((x) => `<div class="br ${x.w}" style="grid-column:${x.c + 1};grid-row:${x.r + 1}">${x.t === 1 ? '<i class="t"></i>' : x.t > 1 ? `<span class="tn">${x.t}</span>` : ""}${x.pp ? '<i class="pp"></i>' : ""}${x.bp ? '<i class="bp"></i>' : ""}</div>`).join("") + `<div style="grid-column:${cols};grid-row:6"></div>`;
   [$("beadscroll"), $("bigscroll")].forEach((e) => { e.scrollLeft = e.scrollWidth; });
 }
-const netOf = (p) => p.chips + (p.id === me ? sum(serverMyBets()) : (betsMap[p.id] && betsMap[p.id].round === state.round ? betsMap[p.id].total : 0)) - START - (p.dep || 0);
+const netOf = (p) => p.chips + bankNow(p) + (p.id === me ? sum(serverMyBets()) : (betsMap[p.id] && betsMap[p.id].round === state.round ? betsMap[p.id].total : 0)) - START - (p.dep || 0);
 function renderSide(list) {
   const on = gate === "in";
   $("sidebtn").hidden = !on; $("statsbtn").hidden = !on; chat.live(on); ach.update(on);

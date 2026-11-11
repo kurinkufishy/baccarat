@@ -37,10 +37,11 @@
 
   <div class="fxconsole">
     <section class="fxp order" aria-label="注文">
-      <div class="fxh">注文</div>
+      <div class="otabs" id="otabs" role="tablist"><button data-o="fx" class="on" role="tab">FX</button><button data-o="hl" role="tab">ハイロー</button></div>
       <div class="levs" id="levs" role="radiogroup" aria-label="レバレッジ"></div>
+      <div class="durs" id="durs" role="radiogroup" aria-label="時間" hidden></div>
       <div class="ordinfo" id="ordinfo"></div>
-      <div class="obtns"><button class="obuy" id="obuy" disabled><span>買い</span><b class="num" id="askp">—</b><small>上がると思う</small></button><button class="osell" id="osell" disabled><span>売り</span><b class="num" id="bidp">—</b><small>下がると思う</small></button></div>
+      <div class="obtns"><button class="obuy" id="obuy" disabled><span id="obuyt">買い</span><b class="num" id="askp">—</b><small id="obuys">上がると思う</small></button><button class="osell" id="osell" disabled><span id="osellt">売り</span><b class="num" id="bidp">—</b><small id="osells">下がると思う</small></button></div>
     </section>
     <section class="fxp" aria-label="自分のポジション">
       <div class="fxh">ポジション <span class="mut" id="poscount"></span><button class="ib sm" id="closeall" hidden>全部決済</button></div>
@@ -63,7 +64,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wt">
     <div class="mhead"><span id="wt">ウォレット</span><button class="x" data-close aria-label="閉じる">×</button></div>
     <div class="wsum"><div><span>残高</span><b class="num" id="wbal">0</b></div><div><span>借金</span><b class="num" id="wdebt">0</b></div></div>
-    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button><button data-w="give" role="tab">あげる</button></div>
+    <div class="tabs wtabs" id="wtabs" role="tablist"><button data-w="borrow" class="on" role="tab">借りる</button><button data-w="repay" role="tab">返す</button><button data-w="help" role="tab">肩代わり</button><button data-w="give" role="tab">あげる</button><button data-w="bank" role="tab">銀行</button></div>
     <div class="wbody" id="wbody"></div>
   </div>
 </div>
@@ -76,6 +77,7 @@
       <b>レバレッジ</b>　証拠金の何倍ぶん取引するか。100倍なら値段が1%動くだけで証拠金と同じ額だけ増えたり減ったりする。<br>
       <b>ロスカット</b>　損が証拠金と同じになったら自動で決済されて、証拠金はなくなる。証拠金より多く負けることはない。<br>
       <b>スプレッド</b>　買いは少し高く、売りは少し安く約定する（差は0.006円）。<br>
+      <b>ハイロー</b>　「ハイロー」タブでは、今の値段から30秒〜5分後に<b>上がるか（HIGH）下がるか（LOW）</b>だけを当てる（ハイローオーストラリア風）。当たると掛け金×倍率（30秒 2.00倍・1分 1.95倍・3分 1.90倍・5分 1.88倍）、外れると掛け金はなくなる。<b>同じ値段だったら負け</b>。判定まで画面を閉じても大丈夫。<br>
       <b>相場</b>　値段はサーバーがランダムに作っていて、誰にも先は読めない。だれもFXの画面を開いていない間は相場が止まる。ポジションは5個まで。<br>
       <b>チップ</b>　バカラ・ブラックジャックと同じ残高を使う。
     </div>

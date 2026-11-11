@@ -2,6 +2,9 @@
 import { avatar } from "./avatar.js";
 
 const MAX_BORROW = 10000000;
+const BANK_RATE = 0.01; // per day, same as the server
+/** Savings balance including interest up to now. */
+export const bankNow = (p, now = Date.now()) => (p && p.bank ? Math.floor(p.bank * Math.pow(1 + BANK_RATE, Math.max(0, now - (p.bankAt || now)) / 86400000)) : 0);
 
 export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, myFree }) {
   const $ = (id) => document.getElementById(id);
@@ -15,6 +18,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
   function max() {
     if (tab === "borrow") return MAX_BORROW;
     if (tab === "repay") return Math.min(myFree(), debt());
+    if (tab === "bank") return myFree();
     const p = target && getPlayers()[target];
     if (!p) return 0;
     return tab === "give" ? myFree() : Math.min(myFree(), p.dep || 0);
@@ -63,6 +67,12 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
           + `<p class="small">自分の残高で相手の借金を払う。相手の借金が減って、自分の収支はその分マイナスになるよ。</p>`;
         ok = p > 0; btn = ok ? btnText(p) : "残高が足りないよ";
       }
+    } else if (tab === "bank") {
+      h = `<div class="bankbox"><div><span class="mut small">預金</span><b class="num" id="bankbal"></b></div><div class="mut small">利息 1日1%（ずっと預けるほど増える）・1日あたり今 +<span class="num" id="bankday"></span></div></div>`
+        + packs([[1000], [10000], [100000], [1000000]]) + amountBox("金額")
+        + `<div class="bankbtns"><button class="go" data-bank="deposit">預ける</button><button class="go alt" data-bank="withdraw">引き出す</button><button class="ib" data-bank="depAll">残高を全部預ける</button><button class="ib" data-bank="wdAll">全部引き出す</button></div>`
+        + `<p class="small">預けたチップはゲームでは使えないけど、なくならないし利息で増える。ランキングの収支には預金もふくまれるよ。</p>`;
+      btn = "";
     } else {
       const ds = others();
       if (!ds.length) h = `<div class="empty">まだほかに誰もいないよ</div>`;
@@ -75,12 +85,24 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
     const key = tab + "|" + h;
     if ($("wbody").dataset.k !== key) { $("wbody").innerHTML = h + (btn ? `<button class="go" id="wgo" style="padding:14px;width:100%;margin-top:4px"></button>` : ""); $("wbody").dataset.k = key; }
     const g = $("wgo"); if (g) { g.textContent = busy ? "処理中…" : btn; g.disabled = busy || !ok; }
+    if (tab === "bank") { const b = bankNow(me()); $("bankbal").textContent = fmt(b); $("bankday").textContent = fmt(Math.floor(b * BANK_RATE)); }
   }
 
   function open() { if (!me()) return; tab = "borrow"; pick = 10000; $("walletm").hidden = false; draw(); }
   $("walletbtn").addEventListener("click", open);
-  $("wtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.w; if (tab === "help" || tab === "give") ensureTarget(); pick = tab === "borrow" ? 10000 : Math.min(1000, max()); draw(); });
+  $("wtabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.w; if (tab === "help" || tab === "give") ensureTarget(); pick = tab === "borrow" || tab === "bank" ? 10000 : Math.min(1000, max()); draw(); });
   $("wbody").addEventListener("click", async (e) => {
+    const bk = e.target.closest("[data-bank]");
+    if (bk && !busy) {
+      const kind = bk.dataset.bank, bal = bankNow(me());
+      const amount = kind === "depAll" ? myFree() : kind === "wdAll" ? bal : pick;
+      const op = kind === "deposit" || kind === "depAll" ? "deposit" : "withdraw";
+      if (!amount || amount < 1) { flash(op === "deposit" ? "預ける額がないよ" : "預金がないよ"); return; }
+      busy = true;
+      try { await call("bank", { op, amount }); flash(`${fmt(amount)} ${op === "deposit" ? "預けました" : "引き出しました"}`); }
+      catch (er) { flash(errMsg(er)); }
+      busy = false; draw(); return;
+    }
     const pk = e.target.closest(".pack"); if (pk) { pick = +pk.dataset.v; const i = $("wamt"); if (i) i.value = ""; draw(); return; }
     const r = e.target.closest(".wrow"); if (r) { target = r.dataset.t; pick = Math.min(pick || 1000, max()); draw(); return; }
     if (!e.target.closest("#wgo") || busy) return;
@@ -119,5 +141,7 @@ export function setupWallet({ call, errMsg, flash, fmt, esc, getMe, getPlayers, 
       flash(t === "h" ? `${who} が借金を ${fmt(e.amount)} 肩代わりしてくれた！` : `${who} から ${fmt(e.amount)} チップもらった！`);
     }
   }
+  // Interest keeps ticking while the bank tab is open.
+  setInterval(() => { if (!$("walletm").hidden && tab === "bank") draw(); }, 1000);
   return { draw, watch };
 }

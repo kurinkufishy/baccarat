@@ -9,7 +9,7 @@ import { GRANTS } from "./grants.js";
 
 const MAX_SOCKETS = 300, MAX_PER_USER = 6, MAX_MSG = 4096;
 const RATE = { perSec: 12, burst: 30 };
-const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets"]);
+const ACTIONS = new Set(["join", "setBets", "leave", "deposit", "repay", "give", "bjBet", "bjAct", "chat", "rename", "setFrame", "setBubble", "fxOpen", "fxClose", "rcBets", "hlOpen", "bank"]);
 const FX_WATCH_MS = 60_000; // a page counts as watching the FX market for this long after its last fxWatch
 
 const csv = (s) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -57,6 +57,7 @@ export class Casino extends DurableObject {
     core.applyGrants(GRANTS, Date.now());
     core.step(Date.now()); // e.g. make the first race card after a deploy
     if (core.changed.size) await this.commit();
+    if (core.hlPending()) this.fxEnsure(); // High/Low options still running after a restart
   }
 
   /** Save whatever changed, push it to everyone, and set the next alarm. */
@@ -202,7 +203,7 @@ export class Casino extends DurableObject {
     try {
       const now = Date.now();
       const watchers = this.ctx.getWebSockets().filter((s) => { const a = s.deserializeAttachment() || {}; return a.uid && a.fxAt && now - a.fxAt < FX_WATCH_MS; });
-      if (!watchers.length) { clearInterval(this.fxTimer); this.fxTimer = null; this.ctx.storage.put("fx", this.core.d.fx); return; }
+      if (!watchers.length && !this.core.hlPending()) { clearInterval(this.fxTimer); this.fxTimer = null; this.ctx.storage.put("fx", this.core.d.fx); return; }
       const r = this.core.fxTick(now);
       const s = JSON.stringify({ type: "batch", now, msgs: [{ type: "fxTick", t: r.t, p: r.p }] });
       for (const w of watchers) { try { w.send(s); } catch { /* closing */ } }

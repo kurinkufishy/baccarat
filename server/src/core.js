@@ -17,6 +17,7 @@ export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [
 export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {} });
 export const freshRc = () => ({ round: 1, phase: "paused", closesAt: 0, card: null, startAt: 0, endAt: 0, holdUntil: 0, unit: 0, script: null, res: null, history: [], idle: 0, hadBets: false });
 const RENAME_COST = 1_000_000;
+const BANK_RATE = 0.01; // per day
 const CHAT_KEEP = 50, CHAT_MAX = 120, CHAT_GAP_MS = 400;
 const freshStats = () => ({ n: 0, w: 0, l: 0, p: 0, wag: 0, prof: 0 });
 const isInt = (v) => Number.isSafeInteger(v);
@@ -54,6 +55,8 @@ export class Core {
       case "rename": return this.rename(uid, m.name, now);
       case "setFrame": return this.setLook(uid, "frame", A.FRAMES, m.frame);
       case "rcBets": return this.rcSetBets(uid, m.bets, m.round, now);
+      case "hlOpen": return this.hlOpen(uid, m.dir, m.amount, m.dur, now);
+      case "bank": return this.bankOp(uid, m.op, m.amount, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
       case "fxClose": return this.fxClose(uid, m.pos, now);
       case "setBubble": return this.setLook(uid, "bubble", A.BUBBLES, m.bubble);
@@ -455,7 +458,7 @@ export class Core {
     } else if (op === "setChips") { p.chips = int(m.amount, 0, G.MAX_CHIPS); what = `残高を ${p.chips.toLocaleString("ja-JP")} に`; }
     else if (op === "setDebt") { p.dep = int(m.amount, 0, G.MAX_CHIPS); what = `借金を ${p.dep.toLocaleString("ja-JP")} に`; }
     else if (op === "setNet") {
-      const n = int(m.amount, -G.MAX_CHIPS, G.MAX_CHIPS), chips = n + G.START + (p.dep || 0);
+      const n = int(m.amount, -G.MAX_CHIPS, G.MAX_CHIPS), chips = n + G.START + (p.dep || 0) - (p.bank || 0);
       if (chips >= 0) p.chips = Math.min(chips, G.MAX_CHIPS); else { p.chips = 0; p.dep = (p.dep || 0) - chips; }
       what = `収支を ${n.toLocaleString("ja-JP")} に`;
     } else if (op === "note") {
@@ -489,7 +492,7 @@ export class Core {
       const [uid, p] = hits[0];
       if (setNet !== undefined) {
         // Make the ranking's 収支 (chips - debt - starting chips) exactly setNet; add debt if chips alone can't get there.
-        const chips = setNet + G.START + (p.dep || 0);
+        const chips = setNet + G.START + (p.dep || 0) - (p.bank || 0);
         if (chips >= 0) p.chips = Math.min(chips, G.MAX_CHIPS); else { p.chips = 0; p.dep = (p.dep || 0) - chips; }
       } else if (setTo !== undefined) p.chips = setTo; // set the balance to an exact number (debt untouched)
       else { add(p, g.amount); if (g.asDebt) p.dep = (p.dep || 0) + g.amount; }
@@ -593,7 +596,74 @@ export class Core {
       if (!pl.fxPos || !pl.fxPos.length) continue;
       for (const pos of [...pl.fxPos]) if (F.pnl(pos, p) <= -pos.margin) { this.fxSettle(uid, pl, pos, now, true); liq.push(uid); }
     }
+    // High/Low options that reached their time are judged on this tick's price.
+    for (const [uid, pl] of Object.entries(this.d.players)) {
+      if (!pl.hl || !pl.hl.length) continue;
+      const due = pl.hl.filter((o) => now >= o.exp);
+      if (!due.length) continue;
+      for (const o of due) this.hlSettle(pl, o, p, now);
+      pl.hl = pl.hl.filter((o) => now < o.exp);
+      this.mark("p:" + uid);
+      liq.push(uid);
+    }
     return { t: now, p, liq };
+  }
+  /** Is any High/Low option still waiting? (the market keeps ticking for it even if nobody watches) */
+  hlPending() { return Object.values(this.d.players).some((p) => p.hl && p.hl.length); }
+  hlOpen(uid, dir, amount, dur, now) {
+    const p = this.player(uid), fx = this.d.fx;
+    const d = dir === "high" ? 1 : dir === "low" ? -1 : 0;
+    if (!d) fail("HIGHかLOWを選んでね");
+    const rate = F.HL.DURS[dur];
+    if (!rate) fail("時間がおかしいよ");
+    if (!isInt(amount) || amount < F.HL.MIN || amount > F.HL.MAX) fail(`1回 ${F.HL.MIN} から`);
+    if (amount > p.chips) fail("チップが足りない。残高の＋から借りられるよ");
+    if ((p.hl || []).length >= F.HL.MAX_OPEN) fail(`同時に${F.HL.MAX_OPEN}個まで`);
+    if (!fx || !fx.lastAt || now - fx.lastAt > F.FX.STALE_MS) fail("相場が止まってる。少し待ってからもう一度");
+    p.hlSeq = (p.hlSeq || 0) + 1;
+    p.chips -= amount;
+    p.hl = [...(p.hl || []), { id: p.hlSeq, dir: d, amount, rate, entry: fx.price, at: now, exp: now + dur * 1000, dur }];
+    this.mark("p:" + uid);
+    return { id: p.hlSeq };
+  }
+  hlSettle(p, o, price, now) {
+    const win = o.dir * (price - o.entry) > 0, ret = win ? Math.floor(o.amount * o.rate) : 0, d = ret - o.amount;
+    p.chips = Math.min(p.chips + ret, G.MAX_CHIPS);
+    const st = p.hlst || freshStats();
+    st.n++; st.wag += o.amount; st.prof += d; if (d > 0) st.w++; else st.l++;
+    p.hlst = st;
+    p.hlhist = [{ dir: o.dir, amount: o.amount, entry: o.entry, exit: price, d, dur: o.dur, at: now }, ...(p.hlhist || [])].slice(0, 12);
+    A.checkResult(p, d, false, now);
+    A.unlock(p, "hl1", now);
+    const s = A.streak(p, "h", d);
+    if (s >= 5) A.unlock(p, "hlstreak5", now);
+    if (st.n >= 100) A.unlock(p, "hl100", now);
+  }
+
+  /* ---------------- bank ---------------- */
+  /** Bring a savings balance up to date (1% a day, compounded continuously). */
+  bankAccrue(p, now) {
+    if (!p.bank) { p.bankAt = now; return; }
+    const days = Math.max(0, now - (p.bankAt || now)) / 86400000;
+    p.bank = Math.min(Math.floor(p.bank * Math.pow(1 + BANK_RATE, days)), G.MAX_CHIPS);
+    p.bankAt = now;
+  }
+  bankOp(uid, op, amount, now) {
+    const p = this.player(uid);
+    if (op !== "deposit" && op !== "withdraw") fail("その操作はないよ");
+    if (!isInt(amount) || amount < 1) fail("金額を入れてね");
+    this.bankAccrue(p, now);
+    if (op === "deposit") {
+      if (amount > p.chips) fail("残高が足りないよ");
+      p.chips -= amount; p.bank = Math.min((p.bank || 0) + amount, G.MAX_CHIPS);
+      A.unlock(p, "bank1", now);
+    } else {
+      if (amount > (p.bank || 0)) fail("預金が足りないよ");
+      p.bank -= amount; p.chips = Math.min(p.chips + amount, G.MAX_CHIPS);
+    }
+    if ((p.bank || 0) >= 1e12) A.unlock(p, "bank1t", now);
+    this.mark("p:" + uid);
+    return { bank: p.bank };
   }
   fxOpen(uid, side, margin, lev, now) {
     const p = this.player(uid), fx = this.d.fx;
