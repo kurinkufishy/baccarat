@@ -47,29 +47,60 @@ const shownEvents = (t) => (sp && sp.ev ? sp.ev.filter((e) => e.m <= minuteAt(t)
 const scoreAt = (t) => { const ev = shownEvents(t).filter((e) => e.k === "goal"); return [ev.filter((e) => e.s === 0).length, ev.filter((e) => e.s === 1).length]; };
 
 /* ================= pitch animation ================= */
-// The ball wanders in a smooth, repeatable way and heads for goal around each event. Home attacks to the right.
-const MEN = [[0.08, 0.5], [0.25, 0.25], [0.25, 0.75], [0.42, 0.4], [0.45, 0.65]];
-let menBuilt = "";
-function buildMen() {
-  const m = sp && sp.match; if (!m) return;
-  const key = m.home.c1 + m.away.c1; if (key === menBuilt) return; menBuilt = key;
-  $("men").innerHTML = [0, 1].map((s) => MEN.map((_, i) => `<i class="man" id="man${s}${i}" style="--c1:${s ? m.away.c1 : m.home.c1};--c2:${s ? m.away.c2 : m.home.c2}"></i>`).join("")).join("");
-}
-const wave = (t, a, b) => Math.sin(t * a) * 0.6 + Math.sin(t * b + 1.3) * 0.4;
-function ballAt(t) {
-  const min = minuteAt(t);
-  let x = 0.5 + 0.32 * wave(min, 0.37, 0.91), y = 0.5 + 0.32 * wave(min, 0.53, 1.37);
-  if (sp && sp.phase === "playing" || sp && sp.phase === "result") {
-    for (const e of sp.ev || []) {
-      const dt = e.m - min; // minutes until the event
-      if (dt < -1.2 || dt > 2.5) continue;
-      const gx = e.s === 0 ? 0.985 : 0.015, k = dt >= 0 ? 1 - dt / 2.5 : 1 + dt / 1.2; // run in, then back out
-      const tx = e.k === "goal" ? gx : e.s === 0 ? 0.9 : 0.1, ty = e.k === "goal" ? 0.5 : 0.35 + ((e.m * 7) % 10) / 33;
-      x += (tx - x) * Math.max(0, Math.min(1, k)); y += (ty - y) * Math.max(0, Math.min(1, k));
+// The ball follows a planned path: calm passing around midfield, then a build-up into the box before every chance or
+// goal, a shot, and (after a goal) a restart from the centre. The plan is seeded by the match number, so everyone
+// sees the same play. Home attacks to the right.
+const MEN = [[0.07, 0.5], [0.24, 0.28], [0.24, 0.72], [0.4, 0.42], [0.44, 0.64]];
+let menBuilt = "", pathKey = "", path = [];
+const men = [[], []];
+function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function buildPath() {
+  const key = sp ? sp.round + ":" + (sp.ev ? sp.ev.length : "-") : "";
+  if (key === pathKey) return;
+  pathKey = key; path = [[0, 0.5, 0.5]];
+  if (!sp || !sp.ev) return;
+  const r = rng(sp.round * 7919 + 17);
+  let t = 0, x = 0.5, y = 0.5;
+  const push = (m, px, py) => { if (m <= t) m = t + 0.15; t = m; x = px; y = py; path.push([m, px, py]); };
+  const wander = (until) => { for (;;) { const next = t + 0.7 + r() * 0.5; if (next > until - 0.6) break; push(next, clamp(x + (r() - 0.5) * 0.3, 0.22, 0.78), clamp(0.5 + (r() - 0.5) * 0.66, 0.14, 0.86)); } };
+  for (const e of [...sp.ev].sort((a, b) => a.m - b.m)) {
+    // Two events close together: play the second one a little later so the ball never flies across the pitch.
+    const dir = e.s === 0 ? 1 : -1, start = Math.max(t + 0.6, e.m - 2.6), em = Math.max(e.m, start + 1.8);
+    wander(start);
+    push(start, 0.5 + dir * 0.08, clamp(y, 0.25, 0.75));
+    push(start + (em - start) * 0.5, 0.5 + dir * 0.27, 0.3 + r() * 0.4);
+    push(em - 0.4, 0.5 + dir * 0.37, 0.36 + r() * 0.28);
+    if (e.k === "goal") {
+      push(em, 0.5 + dir * 0.5, 0.47 + r() * 0.06);   // in the net
+      push(t + 0.8, 0.5 + dir * 0.5, y);              // stays there for a moment
+      push(t + 1.4, 0.5, 0.5);                        // back to the centre spot
+      push(t + 0.5, 0.5, 0.5);
+    } else {
+      const wide = r() < 0.5 ? -1 : 1;
+      push(em, 0.5 + dir * 0.49, 0.5 + wide * (0.12 + r() * 0.06)); // shot just wide / saved
+      push(t + 0.7, 0.5 + dir * 0.42, 0.5 + wide * 0.1);           // goal kick
+      push(t + 1.2, 0.5 + dir * 0.12, 0.3 + r() * 0.4);
     }
   }
-  if (!sp || sp.phase === "paused" || sp.phase === "betting") { x = 0.5; y = 0.5; }
-  return [x, y];
+  wander(90);
+  push(Math.max(t + 0.5, 90), 0.5, 0.5);
+}
+function ballAt(t) {
+  if (!sp || sp.phase === "paused" || sp.phase === "betting") return [0.5, 0.5];
+  buildPath();
+  const m = minuteAt(t);
+  let i = 1;
+  while (i < path.length && path[i][0] < m) i++;
+  if (i >= path.length) { const l = path[path.length - 1]; return [l[1], l[2]]; }
+  const a = path[i - 1], b = path[i], k = clamp((m - a[0]) / (b[0] - a[0] || 1), 0, 1), s = k * k * (3 - 2 * k);
+  return [a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
+}
+function buildMen() {
+  const m = sp && sp.match; if (!m) return;
+  const key = sp.round + m.home.c1 + m.away.c1; if (key === menBuilt) return; menBuilt = key;
+  $("men").innerHTML = [0, 1].map((s) => MEN.map((_, i) => `<i class="man ${i === 0 ? "gk" : ""}" id="man${s}${i}" style="--c1:${s ? m.away.c1 : m.home.c1};--c2:${s ? m.away.c2 : m.home.c2}"></i>`).join("")).join("");
+  for (let s = 0; s < 2; s++) men[s] = MEN.map(([fx, fy]) => [s ? 1 - fx : fx, fy]);
 }
 function frame() {
   requestAnimationFrame(frame);
@@ -77,12 +108,22 @@ function frame() {
   buildMen();
   const t = sNow(), [bx, by] = ballAt(t), el = $("pitch"), W = el.clientWidth, H = el.clientHeight;
   $("ball").style.transform = `translate(${bx * W - 6}px,${by * H - 6}px)`;
-  for (let s = 0; s < 2; s++) for (let i = 0; i < MEN.length; i++) {
-    const m = $("man" + s + i); if (!m) continue;
-    const [fx, fy] = MEN[i], hx = s ? 1 - fx : fx;
-    const pull = sp.phase === "playing" ? 0.35 : 0;
-    const x = hx + (bx - hx) * pull + 0.015 * Math.sin(t / 700 + i * 2 + s), y = fy + (by - fy) * pull * 0.6 + 0.02 * Math.cos(t / 900 + i + s * 3);
-    m.style.transform = `translate(${x * W - 7}px,${y * H - 7}px)`;
+  const playing = sp.phase === "playing" && t >= sp.startAt;
+  for (let s = 0; s < 2; s++) {
+    // The outfield player closest to the ball goes for it; the rest keep shape and slide with play.
+    let near = -1, best = 9;
+    for (let i = 1; i < MEN.length; i++) { const [px, py] = men[s][i] || [0, 0], d = (px - bx) ** 2 + (py - by) ** 2; if (d < best) { best = d; near = i; } }
+    for (let i = 0; i < MEN.length; i++) {
+      const [fx, fy] = MEN[i], hx = s ? 1 - fx : fx;
+      let tx, ty;
+      if (!playing) { tx = hx; ty = fy; }
+      else if (i === 0) { tx = hx; ty = clamp(0.5 + (by - 0.5) * 0.35, 0.38, 0.62); }          // keeper
+      else if (i === near) { tx = bx + (s ? 0.02 : -0.02); ty = by; }                          // chaser
+      else { tx = clamp(hx + (bx - 0.5) * 0.55, 0.05, 0.95); ty = fy + (by - 0.5) * 0.3; }      // keep shape
+      const cur = men[s][i] || [tx, ty];
+      cur[0] += (tx - cur[0]) * 0.08; cur[1] += (ty - cur[1]) * 0.08; men[s][i] = cur;
+      const node = $("man" + s + i); if (node) node.style.transform = `translate(${cur[0] * W - 7}px,${cur[1] * H - 7}px)`;
+    }
   }
 }
 
@@ -259,7 +300,7 @@ $("gatebox").addEventListener("click", async (e) => {
 /* ================= realtime ================= */
 function applyBatch(msgs) {
   for (const m of msgs) {
-    if (m.type === "sp") { const prev = sp && sp.round; sp = m.v; if (prev !== sp.round) { want = null; menBuilt = ""; } }
+    if (m.type === "sp") { const prev = sp && sp.round; sp = m.v; if (prev !== sp.round) { want = null; menBuilt = ""; pathKey = ""; } }
     else if (m.type === "spBets") spBets = m.v || {};
     else if (m.type === "player") { if (m.p) players[m.uid] = m.p; else delete players[m.uid]; if (m.uid === me && m.p && gate === "join") gate = "in"; }
     else if (m.type === "chat") chat.set(m.v);

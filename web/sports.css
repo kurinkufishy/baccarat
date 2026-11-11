@@ -4,7 +4,8 @@
 .pitch{position:absolute;left:3%;right:3%;top:17%;bottom:5%;border-radius:6px;background:repeating-linear-gradient(90deg,#2f8f3f 0 7.14%,#38a24a 7.14% 14.28%);box-shadow:0 10px 30px rgba(0,0,0,.35) inset;overflow:hidden}
 .pitch .lines{position:absolute;inset:0;width:100%;height:100%}
 .men{position:absolute;inset:0}
-.man{position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;background:var(--c1);border:2px solid var(--c2);box-shadow:0 2px 3px rgba(0,0,0,.35);transition:transform .25s linear}
+.man{position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;background:var(--c1);border:2px solid var(--c2);box-shadow:0 2px 3px rgba(0,0,0,.35)}
+.man.gk{border-style:dashed}
 .ball{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d9d9d9 60%,#9a9a9a);box-shadow:0 2px 4px rgba(0,0,0,.45);z-index:2}
 .board{position:absolute;left:50%;top:46px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;background:rgba(8,10,14,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;white-space:nowrap;max-width:94%}
 .board .tm{display:flex;align-items:center;gap:6px;font-weight:800;font-size:13px;overflow:hidden;text-overflow:ellipsis}
