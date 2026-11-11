@@ -38,7 +38,7 @@ export function setupAch({ call, errMsg, flash, esc, fmt, getMe, getPlayers, bus
   function progVal(p, k) {
     const neg = k[0] === "-", key = neg ? k.slice(1) : k;
     let v;
-    if (key === "wag") v = ["st", "bjst", "fxst", "rcst", "hlst", "spst", "pkst", "crst"].reduce((s, f) => s + ((p[f] && p[f].wag) || 0), 0);
+    if (key === "wag") v = ["st", "bjst", "fxst", "rcst", "hlst", "spst", "pkst", "crst", "ccst"].reduce((s, f) => s + ((p[f] && p[f].wag) || 0), 0);
     else if (key === "achn") v = Object.keys(p.ach || {}).filter((id) => id !== "collector" && defs.some((a) => a.id === id)).length;
     else v = key.split(".").reduce((o, f) => (o && typeof o === "object" ? o[f] : undefined), p) || 0;
     return Math.max(0, neg ? -v : v);

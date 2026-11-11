@@ -9,6 +9,20 @@ import * as R from "./race.js";
 import * as S from "./sports.js";
 import * as P from "./poker.js";
 import * as C from "./crash.js";
+import { randomInt } from "./game.js";
+
+// Chinchiro: no banker; everyone pays the same stake and the best hand takes the pot.
+const CC = { MAX: 6, STAKES: [100, 10_000, 1_000_000, 100_000_000, 10_000_000_000], JOIN_MS: 15000, ROLL_MS: 20000, HOLD_MS: 8000 };
+/** Hand value: ピンゾロ 100 > ゾロ目 92..96 > シゴロ 80 > 目 11..16 > 目なし 1 > ヒフミ 0. */
+export function ccHand(d) {
+  const s = [...d].sort((a, b) => a - b), [a, b, c] = s;
+  if (a === b && b === c) return a === 1 ? { v: 100, name: "ピンゾロ" } : { v: 90 + a, name: `${a}のゾロ目` };
+  if (a === 4 && b === 5 && c === 6) return { v: 80, name: "シゴロ" };
+  if (a === 1 && b === 2 && c === 3) return { v: 0, name: "ヒフミ" };
+  if (a === b) return { v: 10 + c, name: `${c}の目` };
+  if (b === c) return { v: 10 + a, name: `${a}の目` };
+  return { v: 1, name: "目なし" };
+}
 const { BJ } = B;
 
 export class GameError extends Error {}
@@ -17,7 +31,8 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {}, pk: freshPk(), pkDeck: { deck: [], hole: {} }, cr: freshCr(), crBets: {}, crSecret: { bust: 1 } });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {}, pk: freshPk(), pkDeck: { deck: [], hole: {} }, cr: freshCr(), crBets: {}, crSecret: { bust: 1 }, cc: freshCc() });
+export const freshCc = () => ({ round: 1, phase: "open", stake: 0, players: {}, closesAt: 0, rollEndsAt: 0, holdUntil: 0, results: null, history: [] });
 export const freshCr = () => ({ round: 1, phase: "paused", closesAt: 0, startAt: 0, bustAt: 0, bust: null, holdUntil: 0, history: [], idle: 0, hadBets: false });
 export const freshPk = () => ({ stake: null, seats: [null, null, null, null, null, null], stacks: {}, away: {}, leaving: {}, hand: null, nextHandAt: 0, handSeq: 0, button: -1 });
 export const freshSp = () => ({ round: 1, phase: "paused", closesAt: 0, match: null, startAt: 0, endAt: 0, holdUntil: 0, ev: null, score: null, history: [], idle: 0, hadBets: false });
@@ -70,6 +85,9 @@ export class Core {
       case "crBet": return this.crBet(uid, m.amount, m.auto, now);
       case "crCancel": return this.crCancel(uid, now);
       case "crCash": return this.crCash(uid, now);
+      case "ccJoin": return this.ccJoin(uid, m.stake, now);
+      case "ccLeave": return this.ccLeave(uid);
+      case "ccRoll": return this.ccRoll(uid, now);
       case "hlOpen": return this.hlOpen(uid, m.dir, m.amount, m.dur, now);
       case "bank": return this.bankOp(uid, m.op, m.amount, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
@@ -417,19 +435,20 @@ export class Core {
   step(now) {
     const did = [];
     for (let i = 0; i < 6; i++) {
-      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now), f = this.pkStep(now), g = this.crStep(now);
+      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now), f = this.pkStep(now), g = this.crStep(now), k = this.ccStep(now);
       if (a) did.push("bac:" + a);
       if (b) did.push("bj:" + b);
       if (c) did.push("rc:" + c);
       if (e) did.push("sp:" + e);
       if (f) did.push("pk:" + f);
       if (g) did.push("cr:" + g);
-      if (!a && !b && !c && !e && !f && !g) break;
+      if (k) did.push("cc:" + k);
+      if (!a && !b && !c && !e && !f && !g && !k) break;
     }
     return did;
   }
   nextDue() {
-    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue(), this.pkDue(), this.crDue()].filter((x) => x !== null);
+    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue(), this.pkDue(), this.crDue(), this.ccDue()].filter((x) => x !== null);
     return ts.length ? Math.min(...ts) : null;
   }
 
@@ -983,6 +1002,91 @@ export class Core {
     return null;
   }
 
+  /* ---------------- chinchiro (dice, everyone puts in the same stake, best hand takes the pot) ---------------- */
+  ccT() { return this.d.cc || (this.d.cc = freshCc()); }
+  ccJoin(uid, stake, now) {
+    const p = this.player(uid), t = this.ccT();
+    if (t.phase !== "open") fail("今は参加できないよ。次の勝負を待ってね");
+    if (t.players[uid]) fail("もう参加してるよ");
+    if (Object.keys(t.players).length >= CC.MAX) fail(`${CC.MAX}人まで`);
+    if (!Object.keys(t.players).length) { if (!CC.STAKES.includes(stake)) fail("賭け金を選んでね"); t.stake = stake; }
+    if (p.chips < t.stake) fail("チップが足りない。残高の＋から借りられるよ");
+    p.chips -= t.stake;
+    t.players[uid] = { rolls: [], hand: null, at: now };
+    if (Object.keys(t.players).length === 2) t.closesAt = now + CC.JOIN_MS;
+    this.mark("p:" + uid, "cc");
+  }
+  ccLeave(uid) {
+    const p = this.player(uid), t = this.ccT();
+    if (t.phase !== "open" || !t.players[uid]) fail("抜けられないよ");
+    p.chips += t.stake; delete t.players[uid];
+    if (Object.keys(t.players).length < 2) t.closesAt = 0;
+    if (!Object.keys(t.players).length) t.stake = 0;
+    this.mark("p:" + uid, "cc");
+  }
+  ccRoll(uid, now) {
+    const t = this.ccT(), me = t.players[uid];
+    if (t.phase !== "rolling") fail("まだ振れないよ");
+    if (!me) fail("この勝負には参加してないよ");
+    if (me.hand) fail("もう役が決まってるよ");
+    this.ccRollOnce(me);
+    if (Object.values(t.players).every((x) => x.hand)) this.ccSettle(now);
+    this.mark("cc");
+  }
+  ccRollOnce(me) {
+    const dice = [randomInt(6) + 1, randomInt(6) + 1, randomInt(6) + 1];
+    me.rolls.push(dice);
+    const h = ccHand(dice);
+    if (h.v !== 1 || me.rolls.length >= 3) me.hand = h; // 目なし can be rolled again, up to 3 times
+  }
+  ccSettle(now) {
+    const t = this.ccT(), ids = Object.keys(t.players), pot = t.stake * ids.length;
+    const top = Math.max(...ids.map((u) => t.players[u].hand.v)), winners = ids.filter((u) => t.players[u].hand.v === top);
+    const share = Math.floor(pot / winners.length);
+    let rest = pot - share * winners.length;
+    t.results = {};
+    for (const u of ids) {
+      const p = this.d.players[u]; if (!p) continue;
+      const won = winners.includes(u) ? share + (rest-- > 0 ? 1 : 0) : 0, d = won - t.stake, h = t.players[u].hand;
+      t.results[u] = won;
+      p.chips = Math.min(p.chips + won, G.MAX_CHIPS);
+      const st = p.ccst || freshStats();
+      st.n++; st.wag += t.stake; st.prof += d; if (d > 0) st.w++; else if (d < 0) st.l++; else st.p++;
+      p.ccst = st; p.cccurve = [...(p.cccurve || []), st.prof].slice(-300);
+      A.checkResult(p, d, false, now);
+      A.unlock(p, "cc1", now);
+      if (h.v === 100) A.unlock(p, "ccpin", now);
+      if (h.v === 80) A.unlock(p, "cc456", now);
+      if (h.v === 0) A.unlock(p, "cc123", now);
+      if (won > 0 && ids.length >= 4) A.unlock(p, "ccking", now);
+      this.mark("p:" + u);
+    }
+    t.phase = "result"; t.holdUntil = now + CC.HOLD_MS;
+    t.history = [...(t.history || []), { r: t.round, win: winners.map((u) => (this.d.players[u] || {}).name), hand: t.players[winners[0]].hand.name, pot }].slice(-12);
+  }
+  ccStep(now) {
+    const t = this.ccT();
+    if (t.phase === "open" && t.closesAt && now >= t.closesAt && Object.keys(t.players).length >= 2) {
+      t.phase = "rolling"; t.rollEndsAt = now + CC.ROLL_MS; this.mark("cc"); return "roll";
+    }
+    if (t.phase === "rolling" && now >= t.rollEndsAt) {
+      for (const me of Object.values(t.players)) while (!me.hand) this.ccRollOnce(me); // slow players roll automatically
+      this.ccSettle(now); this.mark("cc"); return "settle";
+    }
+    if (t.phase === "result" && now >= t.holdUntil) {
+      Object.assign(t, { round: (t.round || 1) + 1, phase: "open", players: {}, stake: 0, closesAt: 0, rollEndsAt: 0, results: null });
+      this.mark("cc"); return "next";
+    }
+    return null;
+  }
+  ccDue() {
+    const t = this.d.cc; if (!t) return null;
+    if (t.phase === "open" && t.closesAt) return t.closesAt;
+    if (t.phase === "rolling") return t.rollEndsAt;
+    if (t.phase === "result") return t.holdUntil;
+    return null;
+  }
+
   /* ---------------- FX ---------------- */
   /** Move the market one tick and stop out anyone whose position has lost its whole margin. */
   fxTick(now) {
@@ -1120,12 +1224,13 @@ export class Core {
     if (key === "pk") return d.pk;
     if (key === "cr") { const { bustAt, ...pub } = d.cr; void bustAt; return pub; } // bustAt would give away the bust point
     if (key === "crBets") return d.crBets;
+    if (key === "cc") return d.cc;
     if (key === "meta") return { imported: !!d.meta.imported };
     if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, pk: this.d.pk, cr: this.view("cr"), crBets: this.d.crBets, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, pk: this.d.pk, cr: this.view("cr"), crBets: this.d.crBets, cc: this.d.cc, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }

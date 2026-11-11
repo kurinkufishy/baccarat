@@ -628,3 +628,24 @@ test("crash: bets, cash out, auto, bust", async () => {
   let s = 0; const N = 200000; for (let i = 0; i < N; i++) s += C.drawBust() >= 2 ? 2 : 0;
   assert.ok(Math.abs(s / N - 0.96) < 0.02, "payback at 2x " + s / N);
 });
+
+test("chinchiro: hands, join, roll, pot", async () => {
+  const { ccHand } = await import("../src/core.js");
+  assert.equal(ccHand([1, 1, 1]).name, "ピンゾロ"); assert.equal(ccHand([6, 4, 5]).name, "シゴロ");
+  assert.equal(ccHand([3, 2, 1]).v, 0); assert.equal(ccHand([2, 5, 2]).name, "5の目"); assert.equal(ccHand([1, 3, 6]).v, 1);
+  assert.ok(ccHand([3, 3, 3]).v > ccHand([4, 5, 6]).v && ccHand([4, 5, 6]).v > ccHand([2, 2, 6]).v);
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  for (const u of ["a", "b", "x"]) c.handle(u, "", "join", { name: u }, 0);
+  nc(() => c.handle("a", "", "ccJoin", { stake: 7 }, 0), /選んで/);
+  c.handle("a", "", "ccJoin", { stake: 100 }, 0);
+  c.handle("b", "", "ccJoin", {}, 0); c.handle("x", "", "ccJoin", {}, 0);
+  nc(() => c.handle("a", "", "ccRoll", {}, 0), /まだ/);
+  c.step(15000); assert.equal(c.d.cc.phase, "rolling");
+  c.handle("a", "", "ccRoll", {}, 15500);
+  c.step(15000 + 20000); assert.equal(c.d.cc.phase, "result");
+  const total = ["a", "b", "x"].reduce((s, u) => s + c.d.players[u].chips, 0);
+  assert.equal(total, 30000, "the pot only moves between players");
+  for (const pl of Object.values(c.d.cc.players)) assert.ok(pl.hand && pl.rolls.length >= 1 && pl.rolls.length <= 3);
+  c.step(35000 + 8000); assert.equal(c.d.cc.phase, "open"); assert.equal(c.d.cc.round, 2);
+});
