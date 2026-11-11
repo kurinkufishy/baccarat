@@ -23,9 +23,8 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
   function draw() {
     const me = getMe(), inc = incoming(), now = Date.now();
     results = results.filter((r) => now - r.at < 9000);
-    box.innerHTML = inc.map((x) => `<div class="dcard"><div class="dt">⚔️ 対戦の申し込み！</div>
-        <div class="dm"><b>${esc(name(x.from))}</b> から ${x.game === "coin" ? "🪙 コイントス" : "🎲 ダイス"}・<b class="num">${fmt(x.stake)}</b>　<span class="num">あと${Math.max(0, Math.ceil((x.expAt - now) / 1000))}秒</span></div>
-        <div class="db"><button class="go" data-acc="${x.id}" ${busy === x.id ? "disabled" : ""}>${busy === x.id ? "勝負中…" : "受ける"}</button>${here ? "" : `<a class="ib" href="duel.html">見に行く</a>`}<button class="ib" data-dec="${x.id}">断る</button><button class="x" data-hide="${x.id}" aria-label="閉じる">×</button></div></div>`).join("")
+    // Only the browser pop-up asks about a duel now; this corner just shows errors (e.g. "too late").
+    box.innerHTML = ""
       + results.map((r) => `<div class="dcard res ${r.win ? "win" : "lose"}"><div class="dt">${r.win ? "🏆 タイマン勝利！" : "💀 タイマン敗北…"}</div><div class="dm">${esc(r.text)}</div></div>`).join("");
     document.title = inc.length ? `(${inc.length}) 対戦が届いた！ - ${baseTitle}` : baseTitle;
     void me;
@@ -50,7 +49,7 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
     const cur = duels.find((d) => d.id === x.id);
     if (!cur || cur.status !== "pending" || cur.expAt <= Date.now()) { popup(); return; }
     asking = true;
-    const ok = window.confirm(`⚔️ ${name(x.from)} から対戦の申し込み！\n\n${x.game === "coin" ? "🪙 コイントス" : "🎲 ダイス"}・${fmt(x.stake)} チップ\n\nOK で受けて勝負する（キャンセルならあとで決められる）`);
+    const ok = window.confirm(`⚔️ ${name(x.from)} から対戦の申し込み！\n\n${x.game === "coin" ? "🪙 コイントス" : "🎲 ダイス"}・${fmt(x.stake)} チップ\n\nOK で受けて勝負する（キャンセルしても、90秒以内ならタイマンのページから受けられる）`);
     asking = false;
     if (ok) {
       busy = x.id; draw();
