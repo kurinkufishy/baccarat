@@ -1,5 +1,5 @@
 // Duel alerts for every page: when a friend challenges you, a card pops up wherever you are on the site.
-// You can take the duel right there or jump to the duel page. Challengers also hear how it ended.
+// You can take the duel right there or jump to the duel page.
 export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
   const box = document.createElement("div");
   box.className = "dwatch"; box.setAttribute("aria-live", "polite");
@@ -72,11 +72,6 @@ export function setupDuelWatch({ call, errMsg, getMe, getPlayers, here }) {
         const k = x.id + ":" + x.status;
         if (known.has(k)) continue;
         if (x.status === "pending" && x.to === me) { beep(); ask.push(x); }
-        if (x.status === "done" && (x.from === me || x.to === me)) {
-          const win = x.winner === me, other = x.from === me ? x.to : x.from;
-          results.push({ at: Date.now(), win, text: `${name(other)} との${x.game === "coin" ? "コイントス" : "ダイス"}（${fmt(x.stake)}）${win ? `に勝って +${fmt(x.stake)}` : `に負けて -${fmt(x.stake)}`}` });
-        }
-        if ((x.status === "declined" || x.status === "expired") && x.from === me) results.push({ at: Date.now(), win: false, text: `${name(x.to)} への申し込みは${x.status === "declined" ? "断られた" : "時間切れ"}。${fmt(x.stake)} は戻ったよ` });
       }
       known = ids;
       draw();
