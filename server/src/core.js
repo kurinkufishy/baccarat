@@ -12,6 +12,7 @@ import * as C from "./crash.js";
 import { randomInt } from "./game.js";
 
 // Chinchiro: no banker; everyone pays the same stake and the best hand takes the pot.
+const DL = { GAMES: ["coin", "dice"], WAIT_MS: 90000 };
 const CC = { MAX: 6, STAKES: [100, 10_000, 1_000_000, 100_000_000, 10_000_000_000], JOIN_MS: 15000, ROLL_MS: 20000, HOLD_MS: 8000 };
 /** Hand value: ピンゾロ 100 > ゾロ目 92..96 > シゴロ 80 > 目 11..16 > 目なし 1 > ヒフミ 0. */
 export function ccHand(d) {
@@ -31,7 +32,7 @@ const fail = (msg) => { throw new GameError(msg); };
 const COLORS = ["#ffc83d", "#7fb2ff", "#ff8592", "#5ff09a", "#d6a2ff", "#ffb870", "#7fe0e0", "#e8eef3"];
 export const freshBac = () => ({ round: 1, phase: "paused", P: [], B: [], res: null, road: [], dealId: 0, closesAt: 0, dealtAt: 0, idle: 0, hadBets: false, shoeLeft: 416 });
 export const freshBj = () => ({ round: 1, phase: "paused", closesAt: 0, hands: [], dealer: [], holeHidden: false, turn: -1, turnEndsAt: 0, seq: 0, animUntil: 0, shoeLeft: BJ.DECKS * 52, history: [] });
-export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {}, pk: freshPk(), pkDeck: { deck: [], hole: {} }, cr: freshCr(), crBets: {}, crSecret: { bust: 1 }, cc: freshCc() });
+export const freshData = () => ({ players: {}, bac: freshBac(), bacBets: {}, bacShoe: "", bj: freshBj(), bjBets: {}, bjShoe: { cards: "", hole: null }, meta: { imported: false }, chat: [], fx: F.freshFx(), rc: freshRc(), rcBets: {}, sp: freshSp(), spBets: {}, pk: freshPk(), pkDeck: { deck: [], hole: {} }, cr: freshCr(), crBets: {}, crSecret: { bust: 1 }, cc: freshCc(), duels: [] });
 export const freshCc = () => ({ round: 1, phase: "open", stake: 0, players: {}, closesAt: 0, rollEndsAt: 0, holdUntil: 0, results: null, history: [] });
 export const freshCr = () => ({ round: 1, phase: "paused", closesAt: 0, startAt: 0, bustAt: 0, bust: null, holdUntil: 0, history: [], idle: 0, hadBets: false });
 export const freshPk = () => ({ stake: null, seats: [null, null, null, null, null, null], stacks: {}, away: {}, leaving: {}, hand: null, nextHandAt: 0, handSeq: 0, button: -1 });
@@ -88,6 +89,8 @@ export class Core {
       case "ccJoin": return this.ccJoin(uid, m.stake, now);
       case "ccLeave": return this.ccLeave(uid);
       case "ccRoll": return this.ccRoll(uid, now);
+      case "duelOffer": return this.duelOffer(uid, m.to, m.stake, m.game, m.call, now);
+      case "duelAnswer": return this.duelAnswer(uid, m.duel, !!m.accept, now);
       case "hlOpen": return this.hlOpen(uid, m.dir, m.amount, m.dur, now);
       case "bank": return this.bankOp(uid, m.op, m.amount, now);
       case "fxOpen": return this.fxOpen(uid, m.side, m.margin, m.lev, now);
@@ -435,7 +438,7 @@ export class Core {
   step(now) {
     const did = [];
     for (let i = 0; i < 6; i++) {
-      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now), f = this.pkStep(now), g = this.crStep(now), k = this.ccStep(now);
+      const a = this.bacStep(now), b = this.bjStep(now), c = this.rcStep(now), e = this.spStep(now), f = this.pkStep(now), g = this.crStep(now), k = this.ccStep(now), q = this.dlStep(now);
       if (a) did.push("bac:" + a);
       if (b) did.push("bj:" + b);
       if (c) did.push("rc:" + c);
@@ -443,12 +446,13 @@ export class Core {
       if (f) did.push("pk:" + f);
       if (g) did.push("cr:" + g);
       if (k) did.push("cc:" + k);
-      if (!a && !b && !c && !e && !f && !g && !k) break;
+      if (q) did.push("dl:" + q);
+      if (!a && !b && !c && !e && !f && !g && !k && !q) break;
     }
     return did;
   }
   nextDue() {
-    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue(), this.pkDue(), this.crDue(), this.ccDue()].filter((x) => x !== null);
+    const ts = [this.bacDue(), this.bjDue(), this.rcDue(), this.spDue(), this.pkDue(), this.crDue(), this.ccDue(), this.dlDue()].filter((x) => x !== null);
     return ts.length ? Math.min(...ts) : null;
   }
 
@@ -1087,6 +1091,69 @@ export class Core {
     return null;
   }
 
+  /** A line in the shared chat from the house (so every page hears about it). */
+  sysChat(text, now) {
+    if (!Array.isArray(this.d.chat)) this.d.chat = [];
+    const last = this.d.chat[this.d.chat.length - 1];
+    this.d.chat.push({ id: (last ? last.id : 0) + 1, uid: "sys", name: "対戦", color: "#f2c14e", text, at: now });
+    if (this.d.chat.length > CHAT_KEEP) this.d.chat = this.d.chat.slice(-CHAT_KEEP);
+    this.mark("chat");
+  }
+
+  /* ---------------- 1v1 duel ---------------- */
+  dlList() { return this.d.duels || (this.d.duels = []); }
+  duelOffer(uid, to, stake, game, call, now) {
+    const p = this.player(uid);
+    if (typeof to !== "string" || !this.d.players[to]) fail("相手がいないよ");
+    if (to === uid) fail("自分とは対戦できないよ");
+    if (!DL.GAMES.includes(game)) fail("ゲームを選んでね");
+    if (game === "coin" && call !== "omote" && call !== "ura") fail("表か裏を選んでね");
+    if (!isInt(stake) || stake < 100 || stake > G.MAX_CHIPS) fail("賭け金は 100 から");
+    if (stake > p.chips) fail("チップが足りない");
+    if (this.dlList().filter((x) => x.status === "pending" && x.from === uid).length >= 3) fail("申し込み中の対戦は3つまで");
+    p.chips -= stake;
+    const id = (this.d.meta.dlSeq = (this.d.meta.dlSeq || 0) + 1);
+    this.d.duels = [{ id, from: uid, to, stake, game, call: game === "coin" ? call : null, status: "pending", at: now, expAt: now + DL.WAIT_MS }, ...this.dlList()].slice(0, 30);
+    this.mark("p:" + uid, "duels", "meta");
+    this.sysChat(`${p.name} → ${this.d.players[to].name}：${stake.toLocaleString("ja-JP")}チップで${game === "coin" ? "コイントス" : "ダイス"}勝負を申し込んだ！（対戦ページで受けられる）`, now);
+    return { id };
+  }
+  duelAnswer(uid, id, accept, now) {
+    const x = this.dlList().find((d) => d.id === id);
+    if (!x || x.status !== "pending") fail("その対戦はもうないよ");
+    if (uid !== x.to && !(uid === x.from && !accept)) fail("あなた宛ての対戦じゃないよ");
+    const a = this.d.players[x.from], b = this.d.players[x.to];
+    if (!accept) { a.chips += x.stake; x.status = uid === x.from ? "canceled" : "declined"; this.mark("p:" + x.from, "duels"); return; }
+    if (b.chips < x.stake) fail("チップが足りない");
+    b.chips -= x.stake;
+    let fromWins, detail;
+    if (x.game === "coin") { const side = randomInt(2) ? "omote" : "ura"; fromWins = side === x.call; detail = { side }; }
+    else { let r1, r2; do { r1 = [randomInt(6) + 1, randomInt(6) + 1]; r2 = [randomInt(6) + 1, randomInt(6) + 1]; } while (r1[0] + r1[1] === r2[0] + r2[1]); fromWins = r1[0] + r1[1] > r2[0] + r2[1]; detail = { from: r1, to: r2 }; }
+    const winId = fromWins ? x.from : x.to, w = this.d.players[winId];
+    w.chips = Math.min(w.chips + x.stake * 2, G.MAX_CHIPS);
+    Object.assign(x, { status: "done", winner: winId, detail, doneAt: now });
+    for (const u of [x.from, x.to]) {
+      const p = this.d.players[u], d = u === winId ? x.stake : -x.stake, st = p.dlst || freshStats();
+      st.n++; st.wag += x.stake; st.prof += d; if (d > 0) st.w++; else st.l++;
+      p.dlst = st;
+      A.checkResult(p, d, false, now);
+      A.unlock(p, "dl1", now);
+      if (d > 0 && x.stake >= 1e8) A.unlock(p, "dlbig", now);
+      if (A.streak(p, "d", d) >= 5) A.unlock(p, "dlstreak", now);
+      this.mark("p:" + u);
+    }
+    this.mark("duels");
+    this.sysChat(`${a.name} vs ${b.name}（${x.stake.toLocaleString("ja-JP")}）→ ${w.name} の勝ち！`, now);
+    return { winner: winId };
+  }
+  dlStep(now) {
+    let did = false;
+    for (const x of this.dlList()) if (x.status === "pending" && now >= x.expAt) { const a = this.d.players[x.from]; if (a) { a.chips += x.stake; this.mark("p:" + x.from); } x.status = "expired"; did = true; }
+    if (did) { this.mark("duels"); return "expire"; }
+    return null;
+  }
+  dlDue() { const t = this.dlList().filter((x) => x.status === "pending").map((x) => x.expAt); return t.length ? Math.min(...t) : null; }
+
   /* ---------------- FX ---------------- */
   /** Move the market one tick and stop out anyone whose position has lost its whole margin. */
   fxTick(now) {
@@ -1225,12 +1292,13 @@ export class Core {
     if (key === "cr") { const { bustAt, ...pub } = d.cr; void bustAt; return pub; } // bustAt would give away the bust point
     if (key === "crBets") return d.crBets;
     if (key === "cc") return d.cc;
+    if (key === "duels") return d.duels || [];
     if (key === "meta") return { imported: !!d.meta.imported };
     if (key === "chat") return d.chat || [];
     if (key.startsWith("p:")) return d.players[key.slice(2)] || null;
     return undefined;
   }
   fullState() {
-    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, pk: this.d.pk, cr: this.view("cr"), crBets: this.d.crBets, cc: this.d.cc, meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
+    return { bac: this.d.bac, bacBets: this.d.bacBets, bj: this.d.bj, bjBets: this.d.bjBets, players: this.d.players, rc: this.view("rc"), rcBets: this.d.rcBets, sp: this.view("sp"), spBets: this.d.spBets, pk: this.d.pk, cr: this.view("cr"), crBets: this.d.crBets, cc: this.d.cc, duels: this.d.duels || [], meta: this.view("meta"), chat: this.view("chat"), achDefs: A.ACH, frameDefs: A.FRAMES, bubbleDefs: A.BUBBLES };
   }
 }

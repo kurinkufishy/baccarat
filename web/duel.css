@@ -1,0 +1,40 @@
+.stage.duel{aspect-ratio:16/7;background:radial-gradient(80% 100% at 50% 50%,#2b1140,#140720 70%,#0a0410)}
+@media (max-width:640px){.stage.duel{aspect-ratio:1/0.95}}
+.arena{position:absolute;inset:60px 4% 40px;display:flex;align-items:center;justify-content:space-around;gap:10px}
+.arena .idle{color:var(--muted);font-weight:700;text-align:center;width:100%}
+.duelist{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:15px;transition:opacity .4s}
+.duelist .dot.big{width:64px;height:64px;font-size:28px}
+.duelist.lose{opacity:.5}.duelist.win b{color:var(--gold)}
+.arena .mid{display:flex;flex-direction:column;align-items:center;gap:8px}
+.coin{position:relative;width:90px;height:90px;transform-style:preserve-3d;transition:transform .2s}
+.coin .f{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:900;backface-visibility:hidden;background:radial-gradient(circle at 35% 30%,#ffe9a0,#d4a017 60%,#8a6410);color:#3a2500;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.coin .u{transform:rotateY(180deg);background:radial-gradient(circle at 35% 30%,#f1f1f1,#a9b0b8 60%,#5f6670);color:#222}
+.coin.ura{transform:rotateY(180deg)}
+.coin.flip.omote{animation:flipO 1.6s cubic-bezier(.2,.7,.3,1)}.coin.flip.ura{animation:flipU 1.6s cubic-bezier(.2,.7,.3,1)}
+@keyframes flipO{from{transform:rotateY(0) translateY(0)}40%{transform:rotateY(1080deg) translateY(-40px)}to{transform:rotateY(1800deg)}}
+@keyframes flipU{from{transform:rotateY(0) translateY(0)}40%{transform:rotateY(1080deg) translateY(-40px)}to{transform:rotateY(1980deg)}}
+.cap{font-size:12px;color:var(--muted)}
+.drow{display:flex;align-items:center;gap:14px}.vs{font-weight:900;color:var(--muted)}
+.dside{display:flex;align-items:center;gap:5px}.dside b{font-size:22px;margin-left:4px}
+.dside.roll{animation:shake2 .8s ease-out}
+@keyframes shake2{0%{transform:rotate(-20deg) scale(.6);opacity:.3}50%{transform:rotate(10deg)}100%{transform:none}}
+.die{display:inline-grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:34px;height:34px;padding:5px;box-sizing:border-box;border-radius:7px;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.35)}
+.die i{display:block;margin:auto;width:60%;height:60%;border-radius:50%}.die i.p{background:#1d1d1f}.die.one i.p{background:#d4202f;width:85%;height:85%}
+.stk{font-size:12px;color:#ffe08a;font-weight:800}
+.winner{font-size:clamp(18px,3vw,26px);font-weight:900}.winner.pop{animation:wpop .5s 1.4s both cubic-bezier(.2,.9,.3,1.4)}
+@keyframes wpop{from{opacity:0;transform:scale(.6)}}
+.duel #pill{top:auto;bottom:8px}
+#offer{display:flex;flex-direction:column;gap:8px}
+.opps{display:flex;flex-wrap:wrap;gap:6px;max-height:130px;overflow:auto}
+.opp{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:5px 10px 5px 5px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.opp.on{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 14%,var(--panel2))}
+.games2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.games2 .lev,.stakes .lev{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:9px 0;font:inherit;font-weight:800;cursor:pointer}
+.games2 .lev.on,.stakes .lev.on{background:var(--gold);color:#1b1406;border-color:var(--gold)}
+.stakes{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+@media (max-width:480px){.stakes{grid-template-columns:repeat(3,1fr)}}
+.trow.inc{outline:1px solid var(--gold)}
+.trow .n small{display:block;font-size:10px;color:var(--muted);font-weight:600}
+.go.sm{padding:6px 12px;border-radius:7px}
+.dn{color:#ff7a84}
+@media (min-width:641px){.arena{left:calc(clamp(190px,22%,270px) + 30px)}}

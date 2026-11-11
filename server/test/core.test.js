@@ -649,3 +649,24 @@ test("chinchiro: hands, join, roll, pot", async () => {
   for (const pl of Object.values(c.d.cc.players)) assert.ok(pl.hand && pl.rolls.length >= 1 && pl.rolls.length <= 3);
   c.step(35000 + 8000); assert.equal(c.d.cc.phase, "open"); assert.equal(c.d.cc.round, 2);
 });
+
+test("duels: offer, accept, decline, expire", () => {
+  const c = new Core(freshData());
+  const nc = (fn, re) => assert.throws(fn, (e) => e.constructor.name === "GameError" && (!re || re.test(e.message)));
+  for (const u of ["a", "b"]) c.handle(u, "", "join", { name: u }, 0);
+  nc(() => c.handle("a", "", "duelOffer", { to: "a", stake: 100, game: "dice" }, 0), /自分/);
+  nc(() => c.handle("a", "", "duelOffer", { to: "b", stake: 100, game: "coin" }, 0), /表か裏/);
+  const { id } = c.handle("a", "", "duelOffer", { to: "b", stake: 1000, game: "coin", call: "omote" }, 0);
+  assert.equal(c.d.players.a.chips, 9000);
+  nc(() => c.handle("a", "", "duelAnswer", { duel: id, accept: true }, 1), /あなた宛て/);
+  c.handle("b", "", "duelAnswer", { duel: id, accept: true }, 1);
+  assert.equal(c.d.players.a.chips + c.d.players.b.chips, 20000);
+  assert.ok([11000, 9000].includes(c.d.players.b.chips));
+  const d2 = c.handle("a", "", "duelOffer", { to: "b", stake: 500, game: "dice" }, 2).id;
+  c.handle("b", "", "duelAnswer", { duel: d2, accept: false }, 3);
+  assert.equal(c.d.players.a.chips + c.d.players.b.chips, 20000);
+  c.handle("a", "", "duelOffer", { to: "b", stake: 500, game: "dice" }, 4);
+  c.step(100000);
+  assert.equal(c.d.duels[0].status, "expired");
+  assert.ok(c.d.chat.some((m) => m.uid === "sys"), "duels are announced in chat"); assert.equal(c.d.players.a.chips + c.d.players.b.chips, 20000);
+});
