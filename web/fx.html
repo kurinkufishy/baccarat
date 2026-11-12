@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com wss://*.workers.dev; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>FX</title>
+<title>FX · KURI/JPY</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rubik:wght@400;500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
@@ -14,50 +14,82 @@
 <link rel="stylesheet" href="fx.css">
 <style>body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
 </head>
-<body>
-<div class="app">
+<body class="xfx">
+<div class="app fxapp">
   <div class="migbar" id="migbar" hidden></div>
-  <section class="stage fx" id="stage" aria-label="チャート">
-    <svg class="layer" id="chart" aria-hidden="true"></svg>
-    <div class="hud">
-      <div class="tname">FX <span class="pair">JPY</span><small>レバレッジ最大100倍 · 1秒ごとに更新</small></div>
-      <div class="icons">
-        <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
-        <button class="ib" id="statsbtn" aria-pressed="false" hidden>統計</button>
-        <button class="ib" id="rulesbtn">ルール</button>
-        <button class="ib acct" id="acctbtn" hidden></button>
+  <header class="xbar">
+    <div class="xpair"><span class="xlogo" aria-hidden="true">FX</span><div><b>KURI/JPY</b><small>架空FX · 最大100x</small></div></div>
+    <div class="xlast"><b class="num" id="hlast">—</b><small class="num" id="hlastsub"></small></div>
+    <div class="xstats" id="xstats"></div>
+    <div class="icons">
+      <span class="ib live" id="live"><i></i><span id="livetxt">接続中</span></span>
+      <button class="ib" id="statsbtn" aria-pressed="false" hidden>統計</button>
+      <button class="ib" id="rulesbtn">ルール</button>
+      <button class="ib acct" id="acctbtn" hidden></button>
+    </div>
+  </header>
+
+  <div class="xgrid">
+    <section class="stage fx" id="stage" aria-label="チャート">
+      <div class="ctool">
+        <div class="tfs" id="cmode" role="tablist" aria-label="時間足"><button data-m="tick" role="tab">ティック</button><button data-m="1" class="on" role="tab">1分</button><button data-m="5" role="tab">5分</button><button data-m="15" role="tab">15分</button></div>
+        <button class="mabtn on" id="mabtn" aria-pressed="true">MA</button>
+        <span class="ctitle">KURI/JPY · <span id="tflabel">1分足</span></span>
       </div>
+      <div class="clegend num" id="clegend"></div>
+      <svg class="layer" id="chart" aria-hidden="true"></svg>
+      <div class="xtoast" id="quote" aria-live="polite"></div>
+      <div class="gate" id="gate">
+        <div class="gatebox" id="gatebox"><h1>FX</h1><p>接続中…</p></div>
+      </div>
+    </section>
+
+    <section class="xbook" aria-label="板と約定">
+      <div class="xtabs" id="btabs" role="tablist"><button data-b="book" class="on" role="tab">板</button><button data-b="trades" role="tab">約定</button></div>
+      <div class="bview" id="bookv">
+        <div class="bhead"><span>価格(JPY)</span><span>数量</span><span>合計</span></div>
+        <div class="asks" id="asks"></div>
+        <div class="bmid" id="bmid"></div>
+        <div class="bids" id="bids"></div>
+        <div class="lsr" id="lsr"></div>
+      </div>
+      <div class="bview" id="tradesv" hidden>
+        <div class="bhead"><span>価格(JPY)</span><span>変化</span><span>時刻</span></div>
+        <div class="trades" id="trades"></div>
+      </div>
+    </section>
+
+    <section class="xorder" aria-label="注文">
+      <div class="xtabs" id="otabs" role="tablist"><button data-o="fx" class="on" role="tab">FX</button><button data-o="hl" role="tab">ハイロー</button></div>
+      <div class="orow" id="fxctl">
+        <span class="xpill">クロス</span>
+        <div class="levwrap"><button class="xpill lv" id="levbtn" aria-haspopup="true" aria-expanded="false">10x</button><div class="levpop" id="levpop" role="radiogroup" aria-label="レバレッジ" hidden></div></div>
+      </div>
+      <div class="durs" id="durs" role="radiogroup" aria-label="判定までの時間" hidden></div>
+      <div class="otype"><span class="on">成行</span><span class="mut">いまの値段ですぐ約定</span></div>
+      <div class="avail"><span class="mut">利用可能</span><b class="num" id="bal">—</b><span class="mut">CHIP</span><button class="xtr" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり・あげる・銀行）" disabled>⇄</button></div>
+      <label class="xin"><span id="amtlb">証拠金</span><input id="amtin" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="0（1k・2.5m もOK）"><em>CHIP</em></label>
+      <div class="xslider"><input type="range" id="pct" min="0" max="100" step="1" value="0" aria-label="残高の何%を使うか"><div class="pmarks" id="pmarks"><button data-p="0">0%</button><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="75">75%</button><button data-p="100">100%</button></div></div>
+      <div class="oinfo" id="ordinfo"></div>
+      <div class="obtns">
+        <div><button class="obuy" id="obuy" disabled><span id="obuyt">ロング</span><small id="obuys">買い・上がると思う</small></button><div class="ometa num" id="obuym"></div></div>
+        <div><button class="osell" id="osell" disabled><span id="osellt">ショート</span><small id="osells">売り・下がると思う</small></button><div class="ometa num" id="osellm"></div></div>
+      </div>
+      <div class="xacct" id="xacct"></div>
+    </section>
+  </div>
+
+  <section class="xpos" aria-label="ポジション">
+    <div class="xtabs line" id="ptabs" role="tablist">
+      <button data-t="pos" class="on" role="tab">ポジション<span id="tc_pos"></span></button>
+      <button data-t="hl" role="tab">ハイロー<span id="tc_hl"></span></button>
+      <button data-t="hist" role="tab">取引履歴</button>
+      <button data-t="all" role="tab">みんなの建玉</button>
+      <button data-t="rank" role="tab">ランキング</button>
+      <span class="sp"></span><button class="ib sm" id="closeall" hidden>全部決済</button>
     </div>
-    <div class="quote" id="quote" aria-live="off"></div>
-    <div class="cmode" id="cmode" role="tablist"><button data-m="tick" class="on" role="tab">ティック</button><button data-m="candle" role="tab">1分足</button></div>
-    <div class="gate" id="gate">
-      <div class="gatebox" id="gatebox"><h1>FX</h1><p>接続中…</p></div>
-    </div>
+    <div class="ptab" id="ptab"></div>
   </section>
-
-  <div class="fxconsole">
-    <section class="fxp order" aria-label="注文">
-      <div class="otabs" id="otabs" role="tablist"><button data-o="fx" class="on" role="tab">FX</button><button data-o="hl" role="tab">ハイロー</button></div>
-      <div class="levs" id="levs" role="radiogroup" aria-label="レバレッジ"></div>
-      <div class="durs" id="durs" role="radiogroup" aria-label="時間" hidden></div>
-      <div class="ordinfo" id="ordinfo"></div>
-      <div class="obtns"><button class="obuy" id="obuy" disabled><span id="obuyt">買い</span><b class="num" id="askp">—</b><small id="obuys">上がると思う</small></button><button class="osell" id="osell" disabled><span id="osellt">売り</span><b class="num" id="bidp">—</b><small id="osells">下がると思う</small></button></div>
-    </section>
-    <section class="fxp" aria-label="自分のポジション">
-      <div class="fxh">ポジション <span class="mut" id="poscount"></span><button class="ib sm" id="closeall" hidden>全部決済</button></div>
-      <div class="plist" id="plist"></div>
-    </section>
-    <section class="fxp" aria-label="みんな">
-      <div class="fxh">みんな</div>
-      <div class="plist" id="others"></div>
-    </section>
-  </div>
-
-  <div class="chipbar" id="chipbar">
-    <div class="bal"><div><span class="lb">残高</span><div class="amt num" id="bal">—</div><span class="debt num" id="debt" hidden></span></div><button class="plus" id="walletbtn" aria-label="ウォレットを開く（借りる・返す・肩代わり・あげる）" disabled>+</button></div>
-    <div class="mid" id="mid"></div>
-    <div class="totbet"><span class="lb">証拠金</span><span class="amt num" id="mytotal">0</span></div>
-  </div>
 </div>
 
 <div class="overlay" id="walletm" hidden>
@@ -78,7 +110,7 @@
       <b>ロスカット</b>　損が証拠金と同じになったら自動で決済されて、証拠金はなくなる。証拠金より多く負けることはない。<br>
       <b>スプレッド</b>　買いは少し高く、売りは少し安く約定する（差は0.006円）。<br>
       <b>ハイロー</b>　「ハイロー」タブでは、今の値段から30秒〜5分後に<b>上がるか（HIGH）下がるか（LOW）</b>だけを当てる（ハイローオーストラリア風）。当たると掛け金×倍率（30秒 2.00倍・1分 1.95倍・3分 1.90倍・5分 1.88倍）、外れると掛け金はなくなる。<b>同じ値段だったら負け</b>。判定まで画面を閉じても大丈夫。<br>
-      <b>相場</b>　値段はサーバーがランダムに作っていて、誰にも先は読めない。だれもFXの画面を開いていない間は相場が止まる。ポジションは5個まで。<br>
+      <b>相場</b>　値段はサーバーがランダムに作っていて、誰にも先は読めない。<b>板</b>の数量は雰囲気づくりの飾りで、値段には影響しない（下の「みんなのロング/ショート比率」だけは本物）。だれもFXの画面を開いていない間は相場が止まる。ポジションは5個まで。<br>
       <b>チップ</b>　バカラ・ブラックジャックと同じ残高を使う。
     </div>
   </div>
